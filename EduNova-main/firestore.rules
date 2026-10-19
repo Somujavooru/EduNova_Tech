@@ -1,0 +1,199 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper functions ───────────────────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Admin check: custom claim (request.auth.token.admin == true) or Firestore role fallback
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
+      );
+    }
+
+    // Alias for rules compatibility
+    function isAnyAdmin() {
+      return isAdmin();
+    }
+
+    // ─── users/{uid} ────────────────────────────────────────────────────────
+    match /users/{uid} {
+      // Authenticated user can read their own document; admins can read all
+      allow read: if isOwner(uid) || isAnyAdmin();
+
+      // Signup flow: normal user can only set role to "user". Custom claim admin can set "admin".
+      allow create: if isOwner(uid)
+        && (request.resource.data.role == "user" || request.auth.token.admin == true);
+
+      // User can only update profile fields via strict ALLOWLIST.
+      // Non-admins CANNOT modify role, availableDiscount, rewardRedeemed, rewardRedeemedAt,
+      // referralUnlocked, referralCompleted, successfulReferralCount, maxReferralAllowed, status, etc.
+      allow update: if isAnyAdmin() || (
+        isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "name",
+          "phoneNumber",
+          "profilePicture",
+          "lastLogin",
+          "referralCode",
+          "college",
+          "degree",
+          "semester",
+          "bio",
+          "updatedAt"
+        ])
+      );
+
+      // Only admins can delete user accounts
+      allow delete: if isAnyAdmin();
+    }
+
+    // ─── orders/{orderId} ──────────────────────────────────────────────────
+    match /orders/{orderId} {
+      // Users can only view their own orders; admins can view all
+      allow read: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isAnyAdmin());
+
+      // Orders must ONLY be created by the server via the Admin SDK
+      allow create: if false;
+
+      // CRITICAL SECURITY FIX: Normal users CANNOT update status, deliveryStatus,
+      // deliveredAt, amount, invoiceId, userId, or utrNumber.
+      // Only admins can approve, reject, or mark orders delivered.
+      allow update: if isAnyAdmin() || (
+        isAuthenticated()
+        && resource.data.userId == request.auth.uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          "status",
+          "deliveryStatus",
+          "deliveredAt",
+          "amount",
+          "utrNumber",
+          "userId",
+          "invoiceId"
+        ])
+      );
+
+      // Only admins can delete orders
+      allow delete: if isAnyAdmin();
+    }
+
+    // ─── custom_requests/{requestId} ─────────────────────────────────────
+    match /custom_requests/{requestId} {
+      allow read: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isAnyAdmin());
+
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == "pending";
+
+      // Normal users cannot directly set status to approved/delivered or modify admin fields like driveUrl
+      allow update: if isAnyAdmin() || (
+        isAuthenticated()
+        && resource.data.userId == request.auth.uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          "driveUrl",
+          "adminNotes",
+          "assignedTo"
+        ])
+      );
+
+      allow delete: if isAnyAdmin();
+    }
+
+    // ─── referrals/{referralId} ───────────────────────────────────────────
+    match /referrals/{referralId} {
+      allow read: if isAuthenticated()
+        && (resource.data.referrerId == request.auth.uid
+          || resource.data.referredUserId == request.auth.uid)
+        || isAnyAdmin();
+
+      allow create: if isAuthenticated()
+        && request.resource.data.referredUserId == request.auth.uid
+        && request.resource.data.status == "pending";
+
+      allow update: if isAnyAdmin();
+
+      allow delete: if false;
+    }
+
+    // ─── reviews/{reviewId} ──────────────────────────────────────────────
+    match /reviews/{reviewId} {
+      allow read: if true;
+
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      allow update: if isAuthenticated()
+        && (
+          resource.data.userId == request.auth.uid
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['helpful', 'helpfulBy'])
+          || isAnyAdmin()
+        );
+
+      allow delete: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isAnyAdmin());
+    }
+
+    // ─── comments/{commentId} ────────────────────────────────────────────
+    match /comments/{commentId} {
+      allow read: if true;
+
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      allow update: if isAuthenticated()
+        && (
+          resource.data.userId == request.auth.uid
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy'])
+          || isAnyAdmin()
+        );
+
+      allow delete: if isAuthenticated()
+        && (resource.data.userId == request.auth.uid || isAnyAdmin());
+    }
+
+    // ─── projects/{projectId} ─────────────────────────────────────────────
+    match /projects/{projectId} {
+      allow read: if true;
+      allow create, update, delete: if isAnyAdmin();
+    }
+
+    // ─── referralCodes/{code} ────────────────────────────────────────────
+    match /referralCodes/{code} {
+      allow read: if true;
+      allow create: if isAuthenticated()
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ─── utrIndex/{utrNumber} ───────────────────────────────────────────
+    // Direct client access forbidden; managed exclusively via server transactions
+    match /utrIndex/{utrNumber} {
+      allow read, write: if false;
+    }
+
+    // ─── contact_messages/{messageId} ──────────────────────────────────────
+    // Direct client creation forbidden. Creation happens exclusively via server Admin SDK in /api/contact.
+    // Reading, updating, and deleting are STRICTLY RESTRICTED to verified admins.
+    match /contact_messages/{messageId} {
+      allow create: if false;
+      allow read, update, delete: if isAnyAdmin();
+    }
+
+    // ─── Deny everything else by default ─────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,35 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // ─── Payment screenshots — scoped per user UID ──────────────────────────
+    match /payment-screenshots/{uid}/{fileName} {
+      // Read: owner or admin (does NOT depend on file metadata)
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
+
+      // Write: owner only, size < 5MB, valid image type, and no overwriting existing file
+      allow write: if isAuthenticated()
+        && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)')
+        && resource == null;
+    }
+
+    // ─── Deny everything else ────────────────────────────────────────────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
