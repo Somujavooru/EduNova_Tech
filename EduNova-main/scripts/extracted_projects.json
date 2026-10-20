@@ -1,0 +1,830 @@
+[
+  {
+    "id": "proj-py-1-2048-game-using-python-tkinter",
+    "title": "2048 Game using Python Tkinter",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      Matrix Algorithms"
+  },
+  {
+    "id": "proj-py-2-valentine-day-card-animation-using-python-turtle",
+    "title": "Valentine Day Card Animation using Python Turtle",
+    "category": "software",
+    "tech": "Python,\n      Turtle Graphics,\n      Procedural Art"
+  },
+  {
+    "id": "proj-py-3-rose-drawing-with-python-turtle-graphics",
+    "title": "Rose Drawing with Python Turtle Graphics",
+    "category": "software",
+    "tech": "Python,\n      Turtle Graphics,\n      Trigonometry"
+  },
+  {
+    "id": "proj-py-4-binary-to-decimal-decimal-to-binary-converter",
+    "title": "Binary to Decimal & Decimal to Binary Converter",
+    "category": "software",
+    "tech": "Python,\n      Algorithms,\n      GUI"
+  },
+  {
+    "id": "proj-py-5-mini-projects-in-python-fast-simple-suite",
+    "title": "Mini Projects in Python - Fast & Simple Suite",
+    "category": "software",
+    "tech": "Python,\n      Standard Library,\n      Scripts"
+  },
+  {
+    "id": "proj-py-6-weather-forecast-web-app-using-django",
+    "title": "Weather Forecast Web App using Django",
+    "category": "web",
+    "tech": "Python,\n      Django,\n      OpenWeather API,\n      Bootstrap"
+  },
+  {
+    "id": "proj-py-7-indian-national-flag-using-turtle-python",
+    "title": "Indian National Flag using Turtle Python",
+    "category": "software",
+    "tech": "Python,\n      Turtle Graphics,\n      Geometry"
+  },
+  {
+    "id": "proj-py-8-notepad-application-using-python-tkinter",
+    "title": "Notepad Application using Python Tkinter",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      File Handling"
+  },
+  {
+    "id": "proj-py-9-phone-number-location-carrier-lookup-tool",
+    "title": "Phone Number Location & Carrier Lookup Tool",
+    "category": "software",
+    "tech": "Python,\n      Phonenumbers Library,\n      Geocoding"
+  },
+  {
+    "id": "proj-py-10-car-racing-2d-arcade-game-pygame",
+    "title": "Car Racing 2D Arcade Game (Pygame)",
+    "category": "software",
+    "tech": "Python,\n      Pygame,\n      2D Physics"
+  },
+  {
+    "id": "proj-py-11-batch-image-to-pdf-converter-using-python-gui",
+    "title": "Batch Image to PDF Converter using Python GUI",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      Pillow,\n      PyPDF2"
+  },
+  {
+    "id": "proj-py-12-library-management-desktop-system-using-python-gui",
+    "title": "Library Management Desktop System using Python GUI",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      SQLite3,\n      CRUD"
+  },
+  {
+    "id": "proj-py-13-interactive-gui-piano-using-python",
+    "title": "Interactive GUI Piano using Python",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      Pygame Sound,\n      Audio Synthesis"
+  },
+  {
+    "id": "proj-py-14-instagram-profile-analytics-metadata-tool",
+    "title": "Instagram Profile Analytics & Metadata Tool",
+    "category": "software",
+    "tech": "Python,\n      Instaloader,\n      Data Analytics"
+  },
+  {
+    "id": "proj-py-15-pikachu-cartoon-drawing-with-python-turtle",
+    "title": "Pikachu Cartoon Drawing with Python Turtle",
+    "category": "software",
+    "tech": "Python,\n      Turtle Graphics,\n      Vector Graphics"
+  },
+  {
+    "id": "proj-py-16-custom-chatgpt-ai-desktop-assistant-using-python",
+    "title": "Custom ChatGPT AI Desktop Assistant using Python",
+    "category": "aiml",
+    "tech": "Python,\n      OpenAI API,\n      CustomTkinter,\n      NLP"
+  },
+  {
+    "id": "proj-py-17-academic-plagiarism-detection-engine-in-python",
+    "title": "Academic Plagiarism Detection Engine in Python",
+    "category": "aiml",
+    "tech": "Python,\n      NLTK,\n      Scikit-Learn,\n      TF-IDF"
+  },
+  {
+    "id": "proj-py-18-sentence-language-detection-using-python-nlp",
+    "title": "Sentence Language Detection using Python NLP",
+    "category": "aiml",
+    "tech": "Python,\n      LangDetect,\n      NLP,\n      Machine Learning"
+  },
+  {
+    "id": "proj-py-19-black-and-white-to-color-image-restorer-opencv",
+    "title": "Black and White to Color Image Restorer (OpenCV)",
+    "category": "aiml",
+    "tech": "Python,\n      OpenCV,\n      Deep Learning,\n      Caffe"
+  },
+  {
+    "id": "proj-py-20-automated-photo-collage-maker-using-python",
+    "title": "Automated Photo Collage Maker using Python",
+    "category": "software",
+    "tech": "Python,\n      Pillow (PIL),\n      Image Processing"
+  },
+  {
+    "id": "proj-py-21-word-cloud-visualizer-using-python",
+    "title": "Word Cloud Visualizer using Python",
+    "category": "software",
+    "tech": "Python,\n      WordCloud,\n      Matplotlib,\n      NLP"
+  },
+  {
+    "id": "proj-py-22-personalized-birthday-wishes-generator-in-python",
+    "title": "Personalized Birthday Wishes Generator in Python",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      Graphics"
+  },
+  {
+    "id": "proj-py-23-secure-otp-verification-system-in-python",
+    "title": "Secure OTP Verification System in Python",
+    "category": "software",
+    "tech": "Python,\n      SMTPLib,\n      Cryptography,\n      Security"
+  },
+  {
+    "id": "proj-py-24-dynamic-quiz-examination-desktop-application",
+    "title": "Dynamic Quiz Examination Desktop Application",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      JSON Database"
+  },
+  {
+    "id": "proj-py-25-bmi-health-calculator-with-diet-insights",
+    "title": "BMI Health Calculator with Diet Insights",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      Health Algorithms"
+  },
+  {
+    "id": "proj-py-26-scientific-calculator-desktop-app-using-python",
+    "title": "Scientific Calculator Desktop App using Python",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      Math Engine"
+  },
+  {
+    "id": "proj-py-27-doraemon-cartoon-character-drawing-in-python",
+    "title": "Doraemon Cartoon Character Drawing in Python",
+    "category": "software",
+    "tech": "Python,\n      Turtle Graphics,\n      Geometry"
+  },
+  {
+    "id": "proj-py-28-convert-text-to-speech-synthesizer-using-python",
+    "title": "Convert Text to Speech Synthesizer using Python",
+    "category": "software",
+    "tech": "Python,\n      Pyttsx3,\n      Audio Processing"
+  },
+  {
+    "id": "proj-py-29-gui-alarm-clock-with-custom-ringtones-in-python",
+    "title": "GUI Alarm Clock with Custom Ringtones in Python",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      Pygame Audio"
+  },
+  {
+    "id": "proj-py-30-flappy-bird-game-clone-with-physics-pygame",
+    "title": "Flappy Bird Game Clone with Physics (Pygame)",
+    "category": "software",
+    "tech": "Python,\n      Pygame,\n      Game Physics"
+  },
+  {
+    "id": "proj-py-31-hangman-word-guessing-game-in-python",
+    "title": "Hangman Word Guessing Game in Python",
+    "category": "software",
+    "tech": "Python,\n      Tkinter / CLI,\n      Algorithms"
+  },
+  {
+    "id": "proj-py-32-sudoku-game-automated-backtracking-solver",
+    "title": "Sudoku Game & Automated Backtracking Solver",
+    "category": "software",
+    "tech": "Python,\n      Pygame,\n      Backtracking Algorithms"
+  },
+  {
+    "id": "proj-py-33-gui-internet-speed-test-analyzer-using-python",
+    "title": "GUI Internet Speed Test Analyzer using Python",
+    "category": "software",
+    "tech": "Python,\n      Speedtest-CLI,\n      CustomTkinter,\n      Matplotlib"
+  },
+  {
+    "id": "proj-py-34-ping-pong-2-player-retro-arcade-game",
+    "title": "Ping Pong 2-Player Retro Arcade Game",
+    "category": "software",
+    "tech": "Python,\n      Turtle / Pygame,\n      2D Physics"
+  },
+  {
+    "id": "proj-py-35-snake-game-with-speed-tiers-highscores",
+    "title": "Snake Game with Speed Tiers & Highscores",
+    "category": "software",
+    "tech": "Python,\n      Pygame,\n      Game Loop"
+  },
+  {
+    "id": "proj-py-36-batch-image-watermark-studio-using-opencv",
+    "title": "Batch Image Watermark Studio using OpenCV",
+    "category": "software",
+    "tech": "Python,\n      OpenCV,\n      Pillow,\n      Batch Processing"
+  },
+  {
+    "id": "proj-py-37-radha-krishna-digital-art-using-python-turtle",
+    "title": "Radha Krishna Digital Art using Python Turtle",
+    "category": "software",
+    "tech": "Python,\n      Turtle Graphics,\n      Procedural Art"
+  },
+  {
+    "id": "proj-py-38-neon-gui-digital-clock-using-python-tkinter",
+    "title": "Neon GUI Digital Clock using Python Tkinter",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      Datetime"
+  },
+  {
+    "id": "proj-py-39-precision-gui-stopwatch-lap-timer",
+    "title": "Precision GUI Stopwatch & Lap Timer",
+    "category": "software",
+    "tech": "Python,\n      Tkinter,\n      Multithreading"
+  },
+  {
+    "id": "proj-py-40-generative-geometric-turtle-patterns-suite",
+    "title": "Generative Geometric Turtle Patterns Suite",
+    "category": "software",
+    "tech": "Python,\n      Turtle Graphics,\n      Fractals"
+  },
+  {
+    "id": "proj-py-41-rock-paper-scissors-game-with-ai-opponent",
+    "title": "Rock Paper Scissors Game with AI Opponent",
+    "category": "software",
+    "tech": "Python,\n      Tkinter / Pygame,\n      Game AI"
+  },
+  {
+    "id": "proj-py-42-mandala-spirograph-generator-in-python",
+    "title": "Mandala & Spirograph Generator in Python",
+    "category": "software",
+    "tech": "Python,\n      Turtle Graphics,\n      Mathematics"
+  },
+  {
+    "id": "proj-py-43-convert-photo-into-pencil-sketch-using-opencv",
+    "title": "Convert Photo into Pencil Sketch using OpenCV",
+    "category": "aiml",
+    "tech": "Python,\n      OpenCV,\n      Image Processing"
+  },
+  {
+    "id": "proj-py-44-automated-whatsapp-message-dispatcher",
+    "title": "Automated WhatsApp Message Dispatcher",
+    "category": "software",
+    "tech": "Python,\n      PyWhatKit,\n      Automation,\n      Selenium"
+  },
+  {
+    "id": "proj-py-45-wi-fi-security-auditor-saved-profile-reader",
+    "title": "Wi-Fi Security Auditor & Saved Profile Reader",
+    "category": "cybersecurity",
+    "tech": "Python,\n      Subprocess,\n      Networking,\n      SysAdmin"
+  },
+  {
+    "id": "proj-java-1-calendar-application-using-java-swing",
+    "title": "Calendar Application using Java Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      JDBC,\n      SQLite"
+  },
+  {
+    "id": "proj-java-2-fitness-tracker-app-using-java-swing",
+    "title": "Fitness Tracker App using Java Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      JFreeChart,\n      SQLite"
+  },
+  {
+    "id": "proj-java-3-javanote-text-based-note-taking-application",
+    "title": "JavaNote - Text-Based Note Taking Application",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      AWT,\n      File I/O"
+  },
+  {
+    "id": "proj-java-4-library-management-system-using-java-swing",
+    "title": "Library Management System using Java Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      JDBC"
+  },
+  {
+    "id": "proj-java-5-digital-clock-using-java-swing",
+    "title": "Digital Clock using Java Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      Threads"
+  },
+  {
+    "id": "proj-java-6-currency-converter-using-java-swing",
+    "title": "Currency Converter using Java Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      REST API,\n      JSON"
+  },
+  {
+    "id": "proj-java-7-stopwatch-with-lap-logging-using-java-swing",
+    "title": "Stopwatch with Lap Logging using Java Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      Concurrency"
+  },
+  {
+    "id": "proj-java-8-hangman-game-using-java-swing",
+    "title": "Hangman Game using Java Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      Game Logic"
+  },
+  {
+    "id": "proj-java-9-digital-clock-package-using-java-swing",
+    "title": "Digital Clock Package using Java Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      Component Architecture"
+  },
+  {
+    "id": "proj-java-10-online-guest-reservation-system-using-java",
+    "title": "Online Guest Reservation System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      JDBC"
+  },
+  {
+    "id": "proj-java-11-tic-tac-toe-game-using-java-swing",
+    "title": "Tic Tac Toe Game using Java Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      Minimax AI"
+  },
+  {
+    "id": "proj-java-12-automated-parking-management-system-using-java",
+    "title": "Automated Parking Management System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      Billing"
+  },
+  {
+    "id": "proj-java-13-temperature-converter-desktop-tool-in-java",
+    "title": "Temperature Converter Desktop Tool in Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      Algorithms"
+  },
+  {
+    "id": "proj-java-14-online-ticket-reservation-system-using-java",
+    "title": "Online Ticket Reservation System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      JasperReports"
+  },
+  {
+    "id": "proj-java-15-word-character-counter-tool-in-java-swing",
+    "title": "Word & Character Counter Tool in Java Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      Regex Parsing"
+  },
+  {
+    "id": "proj-java-16-text-editor-suite-using-java-swing",
+    "title": "Text Editor Suite using Java Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      File Streams"
+  },
+  {
+    "id": "proj-java-17-stock-inventory-management-system-using-java",
+    "title": "Stock & Inventory Management System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      JDBC"
+  },
+  {
+    "id": "proj-java-18-hotel-management-booking-system-using-java",
+    "title": "Hotel Management & Booking System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      JasperReports"
+  },
+  {
+    "id": "proj-java-19-interactive-quiz-game-using-java",
+    "title": "Interactive Quiz Game using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      OOP"
+  },
+  {
+    "id": "proj-java-20-bus-ticket-booking-system-gui-using-java",
+    "title": "Bus Ticket Booking System GUI using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      Seat Canvas"
+  },
+  {
+    "id": "proj-java-21-employee-payroll-hr-management-system-using-java",
+    "title": "Employee Payroll & HR Management System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      Payroll Engine"
+  },
+  {
+    "id": "proj-java-22-airline-flight-reservation-system-using-java",
+    "title": "Airline Flight Reservation System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      PNR Generator"
+  },
+  {
+    "id": "proj-java-23-banking-application-using-java-gui",
+    "title": "Banking Application using Java GUI",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      Security"
+  },
+  {
+    "id": "proj-java-24-atm-simulation-system-using-java",
+    "title": "ATM Simulation System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      Security Hashing,\n      Transactions"
+  },
+  {
+    "id": "proj-java-25-calculator-in-java-using-swing",
+    "title": "Calculator in Java using Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      Expression Parser"
+  },
+  {
+    "id": "proj-java-26-temperature-converter-in-java-using-swing",
+    "title": "Temperature Converter in Java using Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      GUI Components"
+  },
+  {
+    "id": "proj-java-27-currency-converter-in-java-using-swing",
+    "title": "Currency Converter in Java using Swing",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      HTTP Client,\n      JSON"
+  },
+  {
+    "id": "proj-java-28-simple-calculator-using-java",
+    "title": "Simple Calculator using Java",
+    "category": "software",
+    "tech": "Java,\n      AWT / Swing,\n      OOP"
+  },
+  {
+    "id": "proj-java-29-supermarket-pos-billing-system-using-java",
+    "title": "Supermarket POS Billing System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      Thermal Print API"
+  },
+  {
+    "id": "proj-java-30-airline-reservation-system-using-java",
+    "title": "Airline Reservation System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      JDBC"
+  },
+  {
+    "id": "proj-java-31-budget-expense-tracker-using-java",
+    "title": "Budget & Expense Tracker using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      JFreeChart,\n      SQLite"
+  },
+  {
+    "id": "proj-java-32-college-library-management-system-using-java",
+    "title": "College Library Management System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      MySQL,\n      iText PDF"
+  },
+  {
+    "id": "proj-java-33-online-electronic-voting-system-using-java",
+    "title": "Online Electronic Voting System using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      SHA-256,\n      MySQL"
+  },
+  {
+    "id": "proj-java-34-simple-banking-application-using-java",
+    "title": "Simple Banking Application using Java",
+    "category": "software",
+    "tech": "Java,\n      Java Core / Swing,\n      JDBC"
+  },
+  {
+    "id": "proj-java-35-number-guessing-game-with-hints-in-java",
+    "title": "Number Guessing Game with Hints in Java",
+    "category": "software",
+    "tech": "Java,\n      Java Swing,\n      Random Algorithms"
+  },
+  {
+    "id": "proj-web-1-rock-paper-scissors-game-html-css-js",
+    "title": "Rock Paper Scissors Game (HTML, CSS & JS)",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3 Animations,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-2-color-guessing-game-rgb-hex-challenge",
+    "title": "Color Guessing Game (RGB Hex Challenge)",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-3-fanta-modern-brand-landing-page",
+    "title": "Fanta Modern Brand Landing Page",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3 Parallax,\n      GSAP Animations,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-4-youtube-thumbnail-downloader-web-tool",
+    "title": "YouTube Thumbnail Downloader Web Tool",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      Regex"
+  },
+  {
+    "id": "proj-web-5-interactive-love-puzzle-game",
+    "title": "Interactive Love Puzzle Game",
+    "category": "web",
+    "tech": "HTML5,\n      CSS Grid,\n      JavaScript Game Engine"
+  },
+  {
+    "id": "proj-web-6-word-counter-text-analyzer-website",
+    "title": "Word Counter & Text Analyzer Website",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript Regex"
+  },
+  {
+    "id": "proj-web-7-responsive-restaurant-table-booking-website",
+    "title": "Responsive Restaurant & Table Booking Website",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      Swiper.js"
+  },
+  {
+    "id": "proj-web-8-student-registration-academic-dashboard",
+    "title": "Student Registration & Academic Dashboard",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      Chart.js"
+  },
+  {
+    "id": "proj-web-9-personal-finance-budget-tracker-website",
+    "title": "Personal Finance & Budget Tracker Website",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      ApexCharts"
+  },
+  {
+    "id": "proj-web-10-classic-snake-game-html5-canvas-js",
+    "title": "Classic Snake Game (HTML5 Canvas & JS)",
+    "category": "web",
+    "tech": "HTML5 Canvas,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-11-responsive-music-player-web-app",
+    "title": "Responsive Music Player Web App",
+    "category": "web",
+    "tech": "HTML5 Audio API,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-12-responsive-modern-sign-in-sign-up-form",
+    "title": "Responsive Modern Sign In & Sign Up Form",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3 Transitions,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-13-flappy-bird-web-game-html5-canvas",
+    "title": "Flappy Bird Web Game (HTML5 Canvas)",
+    "category": "web",
+    "tech": "HTML5 Canvas,\n      JavaScript Physics,\n      CSS3"
+  },
+  {
+    "id": "proj-web-14-facebook-social-feed-ui-clone",
+    "title": "Facebook Social Feed UI Clone",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3 Flexbox,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-15-spotify-web-streaming-player-clone",
+    "title": "Spotify Web Streaming Player Clone",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      Web Audio API"
+  },
+  {
+    "id": "proj-web-16-support-ticket-management-system",
+    "title": "Support Ticket Management System",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      LocalStorage"
+  },
+  {
+    "id": "proj-web-17-pong-2-player-retro-arcade-game",
+    "title": "Pong 2-Player Retro Arcade Game",
+    "category": "web",
+    "tech": "HTML5 Canvas,\n      JavaScript,\n      Game Loop"
+  },
+  {
+    "id": "proj-web-18-facebook-login-page-with-validation",
+    "title": "Facebook Login Page with Validation",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-19-maze-navigation-game-in-javascript",
+    "title": "Maze Navigation Game in JavaScript",
+    "category": "web",
+    "tech": "HTML5 Canvas,\n      JavaScript Maze Algorithm"
+  },
+  {
+    "id": "proj-web-20-word-scramble-vocabulary-game",
+    "title": "Word Scramble Vocabulary Game",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-21-corporate-responsive-business-landing-page",
+    "title": "Corporate Responsive Business Landing Page",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3 Grid,\n      Vanilla JS"
+  },
+  {
+    "id": "proj-web-22-clean-minimalist-personal-website",
+    "title": "Clean Minimalist Personal Website",
+    "category": "web",
+    "tech": "HTML5,\n      Modern CSS3"
+  },
+  {
+    "id": "proj-web-23-holi-festival-fluid-particle-animation",
+    "title": "Holi Festival Fluid Particle Animation",
+    "category": "web",
+    "tech": "HTML5 Canvas,\n      WebGL / Physics,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-24-recipe-finder-meal-planner-app-react",
+    "title": "Recipe Finder & Meal Planner App (React)",
+    "category": "web",
+    "tech": "React,\n      JavaScript,\n      Tailwind CSS,\n      REST API"
+  },
+  {
+    "id": "proj-web-25-interactive-quiz-app-react-tailwind",
+    "title": "Interactive Quiz App (React & Tailwind)",
+    "category": "web",
+    "tech": "React,\n      Tailwind CSS,\n      State Management"
+  },
+  {
+    "id": "proj-web-26-modern-audio-music-player-react",
+    "title": "Modern Audio Music Player (React)",
+    "category": "web",
+    "tech": "React,\n      HTML5 Audio,\n      Tailwind CSS"
+  },
+  {
+    "id": "proj-web-27-expense-tracker-app-react-framework",
+    "title": "Expense Tracker App (React & Framework)",
+    "category": "web",
+    "tech": "React,\n      Chart.js,\n      Tailwind CSS"
+  },
+  {
+    "id": "proj-web-28-full-featured-e-commerce-storefront-react",
+    "title": "Full-Featured E-Commerce Storefront (React)",
+    "category": "web",
+    "tech": "React,\n      Tailwind CSS,\n      Cart State,\n      Stripe Ready"
+  },
+  {
+    "id": "proj-web-29-personal-developer-portfolio-html-css-js",
+    "title": "Personal Developer Portfolio (HTML/CSS/JS)",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      Lucide Icons"
+  },
+  {
+    "id": "proj-web-30-netflix-streaming-ui-clone",
+    "title": "Netflix Streaming UI Clone",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      TMDB API"
+  },
+  {
+    "id": "proj-web-31-tic-tac-toe-with-unbeatable-ai-opponent",
+    "title": "Tic Tac Toe with Unbeatable AI Opponent",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript Minimax"
+  },
+  {
+    "id": "proj-web-32-typing-speed-test-challenge-wpm-accuracy",
+    "title": "Typing Speed Test Challenge (WPM & Accuracy)",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript WPM Engine"
+  },
+  {
+    "id": "proj-web-33-amazon-storefront-layout-clone",
+    "title": "Amazon Storefront Layout Clone",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3 Flexbox,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-34-qr-code-generator-styler-web-tool",
+    "title": "QR Code Generator & Styler Web Tool",
+    "category": "web",
+    "tech": "HTML5,\n      JavaScript,\n      QRCode.js,\n      Canvas"
+  },
+  {
+    "id": "proj-web-35-hangman-word-mystery-game",
+    "title": "Hangman Word Mystery Game",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-36-ai-text-to-image-generation-web-studio",
+    "title": "AI Text to Image Generation Web Studio",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      AI API"
+  },
+  {
+    "id": "proj-web-37-live-breaking-news-portal-with-category-filters",
+    "title": "Live Breaking News Portal with Category Filters",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      NewsAPI"
+  },
+  {
+    "id": "proj-web-38-speech-to-text-voice-transcriber",
+    "title": "Speech to Text & Voice Transcriber",
+    "category": "web",
+    "tech": "HTML5,\n      Web Speech API,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-39-multi-currency-live-exchange-converter",
+    "title": "Multi-Currency Live Exchange Converter",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      Exchange API"
+  },
+  {
+    "id": "proj-web-40-virtual-drum-kit-with-keyboard-audio-triggers",
+    "title": "Virtual Drum Kit with Keyboard Audio Triggers",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript Audio API"
+  },
+  {
+    "id": "proj-web-41-sticky-notes-quick-scratchpad-web-app",
+    "title": "Sticky Notes & Quick Scratchpad Web App",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      LocalStorage"
+  },
+  {
+    "id": "proj-web-42-productivity-to-do-list-with-category-tags",
+    "title": "Productivity To-Do List with Category Tags",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      LocalStorage"
+  },
+  {
+    "id": "proj-web-43-interactive-bmi-body-health-calculator",
+    "title": "Interactive BMI Body Health Calculator",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-44-real-time-websocket-group-chat-application",
+    "title": "Real-Time WebSocket Group Chat Application",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      Node.js,\n      Socket.io"
+  },
+  {
+    "id": "proj-web-45-interactive-login-register-with-password-strength",
+    "title": "Interactive Login & Register with Password Strength",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-46-dynamic-scientific-calculator-web-app",
+    "title": "Dynamic Scientific Calculator Web App",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-47-guess-the-number-web-challenge",
+    "title": "Guess the Number Web Challenge",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-48-kanban-task-manager-project-board",
+    "title": "Kanban Task Manager & Project Board",
+    "category": "web",
+    "tech": "HTML5 Drag & Drop,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-49-animated-weather-dashboard-with-5-day-forecast",
+    "title": "Animated Weather Dashboard with 5-Day Forecast",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      Weather API"
+  },
+  {
+    "id": "proj-web-50-custom-event-countdown-timer-suite",
+    "title": "Custom Event Countdown Timer Suite",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript,\n      Canvas Confetti"
+  },
+  {
+    "id": "proj-web-51-web-based-library-catalog-book-search",
+    "title": "Web-Based Library Catalog & Book Search",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-52-3d-cube-interactive-image-slider",
+    "title": "3D Cube Interactive Image Slider",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3 3D Transforms,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-53-glassmorphism-ui-component-profile-suite",
+    "title": "Glassmorphism UI Component & Profile Suite",
+    "category": "web",
+    "tech": "HTML5,\n      Modern CSS3,\n      Glassmorphism"
+  },
+  {
+    "id": "proj-web-54-neumorphism-soft-ui-login-profile-dashboard",
+    "title": "Neumorphism Soft UI Login & Profile Dashboard",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3 Neumorphism,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-55-on-screen-virtual-keyboard-component",
+    "title": "On-Screen Virtual Keyboard Component",
+    "category": "web",
+    "tech": "HTML5,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-56-drag-drop-sortable-list-component",
+    "title": "Drag & Drop Sortable List Component",
+    "category": "web",
+    "tech": "HTML5 Drag API,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-57-drawing-canvas-sketching-web-studio",
+    "title": "Drawing Canvas & Sketching Web Studio",
+    "category": "web",
+    "tech": "HTML5 Canvas API,\n      CSS3,\n      JavaScript"
+  },
+  {
+    "id": "proj-web-58-cryptographic-password-generator-vault-tool",
+    "title": "Cryptographic Password Generator & Vault Tool",
+    "category": "web",
+    "tech": "HTML5,\n      Crypto API,\n      JavaScript,\n      CSS3"
+  }
+]

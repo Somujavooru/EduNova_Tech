@@ -1,0 +1,12 @@
+{
+  "name": "edunova-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix EduNova-main run dev",
+    "build": "npm --prefix EduNova-main run build",
+    "start": "npm --prefix EduNova-main run start",
+    "lint": "npm --prefix EduNova-main run lint",
+    "test:security": "npm --prefix EduNova-main run test:security"
+  }
+}
