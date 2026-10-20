@@ -350,9 +350,21 @@ function SignupForm() {
                   </div>
                 </div>
               ) : error ? (
-                <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2.5">
-                  <XCircle className="w-4 h-4 shrink-0" />
-                  <span>{error}</span>
+                <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2.5">
+                    <XCircle className="w-4 h-4 shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                  {error.includes("already exists") && (
+                    <div className="pl-6.5 pt-0.5">
+                      <Link
+                        href={`/login?email=${encodeURIComponent(email)}`}
+                        className="text-xs font-bold text-amber-400 hover:text-amber-300 underline underline-offset-2"
+                      >
+                        Click here to Sign In &rarr;
+                      </Link>
+                    </div>
+                  )}
                 </div>
               ) : null}
 

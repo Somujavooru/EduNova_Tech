@@ -17,6 +17,11 @@ Thumbs.db
 serviceAccountKey.json
 *serviceAccount*.json
 *-adminsdk-*.json
+**/serviceAccountKey.json
+**/*serviceAccount*.json
+**/*-adminsdk-*.json
+**/.env.local
+**/.env.*.local
 
 node_modules/
 EduNova-main.7z

@@ -385,68 +385,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error: unknown) {
       const code = (error as { code?: string })?.code || "";
       if (code === "auth/email-already-in-use") {
-        const isUserAdmin = checkIsAdmin(email);
-        // For non-admin user/student accounts, seamlessly re-claim with fresh details or offer quick reset
-        if (!isUserAdmin && password) {
-          try {
-            // Attempt to authenticate with the entered password
-            const existingCred = await signInWithEmailAndPassword(auth, email, password);
-            await updateProfile(existingCred.user, { displayName: name });
-
-            // Re-initialize Firestore document fresh with the newly submitted details
-            const now = new Date().toISOString();
-            const storedReferredBy = typeof window !== "undefined" ? sessionStorage.getItem("edunova_ref") : null;
-            const freshUser: User & { createdAt: string } = {
-              id: existingCred.user.uid,
-              name,
-              email,
-              phoneNumber: phoneNumber || null,
-              role: "user",
-              provider: "email",
-              profilePicture: null,
-              lastLogin: now,
-              createdAt: now,
-              referredBy: storedReferredBy || null,
-              availableDiscount: 0,
-              referralUnlocked: false,
-              referralCompleted: false,
-              successfulReferralCount: 0,
-              maxReferralAllowed: 1,
-            };
-
-            const userRef = doc(db, "users", existingCred.user.uid);
-            await setDoc(userRef, freshUser);
-
-            if (storedReferredBy) {
-              import("@/lib/data/referrals").then(({ createReferral }) =>
-                createReferral(storedReferredBy, existingCred.user.uid)
-              );
-            }
-
-            // Send email verification if unverified
-            if (!existingCred.user.emailVerified) {
-              try {
-                await sendEmailVerification(existingCred.user);
-              } catch {}
-            }
-
-            // Sign out user immediately so they must verify or log in fresh
-            await signOut(auth);
-            setUser(null);
-
-            triggerEmailEvent("welcome", email, name);
-            return null; // Successfully claimed and registered with fresh details!
-          } catch {
-            // If the password does not match the old password, send a reset email so the user can easily reset and start fresh
-            try {
-              await sendPasswordResetEmail(auth, email);
-              return "EMAIL_EXISTS_RESET_SENT:" + email;
-            } catch {
-              return "This email is already registered with a different password. Please log in or use 'Forgot password' on the login page.";
-            }
-          }
-        }
-        return "This email is already registered. Please log in instead.";
+        return "An account with this email address already exists. Please log in instead, or use 'Forgot password' on the login page.";
       }
       if (code === "auth/weak-password") return "Password must be at least 6 characters.";
       if (code === "auth/invalid-email") return "Please enter a valid email address.";
