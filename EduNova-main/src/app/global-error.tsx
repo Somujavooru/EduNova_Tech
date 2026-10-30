@@ -38,7 +38,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
               marginBottom: 12,
             }}
           >
-            EduNova encountered a critical error
+            EduNova Forge encountered a critical error
           </h1>
           <p
             style={{

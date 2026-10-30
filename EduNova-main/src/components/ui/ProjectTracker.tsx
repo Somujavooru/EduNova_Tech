@@ -11,7 +11,7 @@ export interface TrackingMilestone {
   progressPercent: number;
 }
 
-// Default 13-step lifecycle
+// Default 12-step lifecycle for Custom Project Requests (inquiries, negotiation, and build)
 export const DEFAULT_MILESTONES: TrackingMilestone[] = [
   { stage: "pending", label: "Request Submitted", progressPercent: 0 },
   { stage: "reviewing", label: "Under Review", progressPercent: 5 },
@@ -27,6 +27,16 @@ export const DEFAULT_MILESTONES: TrackingMilestone[] = [
   { stage: "delivered", label: "Delivered", progressPercent: 100 },
 ];
 
+// Dedicated streamlined 6-step lifecycle for Build-on-Order / Catalog Orders
+export const BUILD_MILESTONES: TrackingMilestone[] = [
+  { stage: "order_placed", label: "Order Placed & Advance Paid", progressPercent: 10 },
+  { stage: "planning", label: "Planning & Architecture", progressPercent: 25 },
+  { stage: "building", label: "Hardware & Circuit Assembly", progressPercent: 50 },
+  { stage: "testing", label: "Testing, Code & QA", progressPercent: 75 },
+  { stage: "completed", label: "Completed (Ready for Delivery)", progressPercent: 95 },
+  { stage: "delivered", label: "Fully Paid & Delivered", progressPercent: 100 },
+];
+
 interface ProjectTrackerProps {
   currentStatus: string;
   trackingHistory?: TrackingMilestone[];
@@ -34,6 +44,7 @@ interface ProjectTrackerProps {
   adminMode?: boolean;
   estimatedCompletion?: string;
   lastUpdated?: string;
+  isBuildOrder?: boolean;
 }
 
 export function ProjectTracker({
@@ -43,16 +54,88 @@ export function ProjectTracker({
   adminMode = false,
   estimatedCompletion,
   lastUpdated,
+  isBuildOrder = false,
 }: ProjectTrackerProps) {
-  // Merge default milestones with any custom tracking data
-  const milestones = DEFAULT_MILESTONES.map(m => {
-    const tracked = trackingHistory?.find(t => t.stage === m.stage);
+  const baseMilestones = isBuildOrder ? BUILD_MILESTONES : DEFAULT_MILESTONES;
+
+  // Merge milestones with any custom tracking history if provided
+  const milestones = baseMilestones.map((m) => {
+    const tracked = trackingHistory?.find((t) => t.stage === m.stage);
     return tracked ? { ...m, ...tracked } : m;
   });
 
-  // When pending, the request is submitted AND under review
-  const effectiveStatus = currentStatus === "pending" ? "reviewing" : currentStatus;
-  const currentIndex = milestones.findIndex(m => m.stage === effectiveStatus);
+  // Normalize status string to handle aliases cleanly
+  const normalizeStatus = (raw: string, forBuild: boolean): string => {
+    const s = (raw || "").toLowerCase().trim();
+    if (!s) return forBuild ? "planning" : "reviewing";
+
+    // 100% Delivered aliases
+    if (["delivered", "full_delivered", "delivery_completed", "done"].includes(s)) {
+      return "delivered";
+    }
+
+    // 95% Completed / Ready for delivery aliases
+    if (
+      [
+        "completed",
+        "ready_for_delivery",
+        "ready",
+        "awaiting_final_payment",
+        "final_payment_pending",
+        "final_payment_verifying",
+        "final_review",
+      ].includes(s)
+    ) {
+      return forBuild ? "completed" : s === "final_review" ? "final_review" : "completed";
+    }
+
+    // 75% Testing / Verification aliases
+    if (["testing", "qa", "verification", "tested"].includes(s)) {
+      return "testing";
+    }
+
+    // 40-55% Building / Development aliases
+    if (["building", "development", "in_progress", "in-progress", "coding", "assembly"].includes(s)) {
+      return forBuild ? "building" : "development";
+    }
+
+    // 25-30% Planning aliases
+    if (["planning", "project_planning", "planned", "architecture"].includes(s)) {
+      return "planning";
+    }
+
+    // Initial stage aliases
+    if (["order_placed", "placed", "advance_paid", "advance_verified", "accepted"].includes(s)) {
+      return forBuild ? "order_placed" : "accepted";
+    }
+    if (["pending", "reviewing", "under_review"].includes(s)) {
+      return forBuild ? "order_placed" : "reviewing";
+    }
+
+    return s;
+  };
+
+  const effectiveStatus = normalizeStatus(currentStatus, isBuildOrder);
+  let currentIndex = milestones.findIndex((m) => m.stage === effectiveStatus);
+
+  // Safe fallback if stage string is unfamiliar — never let an active build order default to 0%
+  if (currentIndex === -1) {
+    if (effectiveStatus.includes("deliver")) {
+      currentIndex = milestones.length - 1;
+    } else if (effectiveStatus.includes("complete") || effectiveStatus.includes("ready")) {
+      currentIndex = milestones.findIndex((m) => m.stage === "completed");
+    } else if (effectiveStatus.includes("test")) {
+      currentIndex = milestones.findIndex((m) => m.stage === "testing");
+    } else if (effectiveStatus.includes("build") || effectiveStatus.includes("dev")) {
+      currentIndex = milestones.findIndex((m) => m.stage === (isBuildOrder ? "building" : "development"));
+    } else if (isBuildOrder) {
+      currentIndex = 1; // Default to Planning (25%) rather than 0%
+    } else {
+      currentIndex = 0;
+    }
+    if (currentIndex < 0) currentIndex = 0;
+  }
+
   const currentMilestone = milestones[currentIndex] || milestones[0];
   const progressPercent = currentMilestone.progressPercent;
 
@@ -91,14 +174,16 @@ export function ProjectTracker({
         <motion.div
           className="absolute left-[11px] top-2 w-px bg-gradient-to-b from-[var(--color-neon-purple)] to-[var(--color-neon-blue)]"
           initial={{ height: 0 }}
-          animate={{ height: currentIndex >= 0 ? `${(currentIndex / (milestones.length - 1)) * 100}%` : 0 }}
+          animate={{ height: currentIndex >= 0 ? `${(currentIndex / Math.max(milestones.length - 1, 1)) * 100}%` : 0 }}
           transition={{ duration: 1, ease: "easeOut" }}
         />
 
         {milestones.map((milestone, index) => {
-          const isCompleted = index <= currentIndex;
-          const isCurrent = index === currentIndex + 1;
-          const isFuture = index > currentIndex + 1;
+          // If 100% delivered, all nodes are completed
+          const isAllDelivered = progressPercent === 100;
+          const isCompleted = isAllDelivered || index < currentIndex;
+          const isCurrent = !isAllDelivered && index === currentIndex;
+          const isFuture = !isAllDelivered && index > currentIndex;
 
           return (
             <div key={milestone.stage} className="relative flex items-start gap-3 mb-4 last:mb-0">
@@ -125,17 +210,25 @@ export function ProjectTracker({
               </div>
 
               {/* Content */}
-              <div className={`flex-1 rounded-lg px-3 py-2 transition-all ${
-                isCurrent
-                  ? "bg-[var(--color-neon-blue)]/10 border border-[var(--color-neon-blue)]/30"
-                  : isCompleted
+              <div
+                className={`flex-1 rounded-lg px-3 py-2 transition-all ${
+                  isCurrent
+                    ? "bg-[var(--color-neon-blue)]/10 border border-[var(--color-neon-blue)]/30"
+                    : isCompleted
                     ? "bg-green-500/5 border border-green-500/10"
                     : "bg-white/[0.02] border border-white/5"
-              }`}>
+                }`}
+              >
                 <div className="flex items-center justify-between">
-                  <span className={`text-sm font-bold ${
-                    isCurrent ? "text-[var(--color-neon-blue)]" : isCompleted ? "text-green-400" : "text-gray-500"
-                  }`}>
+                  <span
+                    className={`text-sm font-bold ${
+                      isCurrent
+                        ? "text-[var(--color-neon-blue)]"
+                        : isCompleted
+                        ? "text-green-400"
+                        : "text-gray-500"
+                    }`}
+                  >
                     {milestone.label}
                   </span>
                   {milestone.completedAt && (

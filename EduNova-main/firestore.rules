@@ -191,6 +191,14 @@ service cloud.firestore {
       allow read, update, delete: if isAnyAdmin();
     }
 
+    // ─── settings/{document} ──────────────────────────────────────────────
+    // Public read for platform settings (UPI ID, banner, QR scanner image);
+    // Write restricted strictly to verified platform admins.
+    match /settings/{document} {
+      allow read: if true;
+      allow write: if isAnyAdmin();
+    }
+
     // ─── Deny everything else by default ─────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

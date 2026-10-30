@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { FilterSidebar } from "@/components/ui/FilterSidebar";
@@ -8,13 +9,33 @@ import { ProjectDetailModal } from "@/components/ui/ProjectDetailModal";
 import { getPublicProjects, Project, isProjectReadyToDownload } from "@/lib/data/mockProjects";
 import { CategoryKey, categories } from "@/lib/data/categories";
 import { StarRating } from "@/components/ui/StarRating";
-import { Search, SlidersHorizontal, Eye, Sparkles, Rocket, Hammer } from "lucide-react";
+import { Search, SlidersHorizontal, Eye, Sparkles, Rocket, Hammer, CheckCircle, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MarketplaceBackground } from "@/components/backgrounds/MarketplaceBackground";
 import { ProjectChatbot } from "@/components/ui/ProjectChatbot";
+import { useAuth } from "@/context/AuthContext";
+import { getOrdersByUser, Order } from "@/lib/data/orders";
 
-export default function MarketplacePage() {
+const CATEGORY_MAP: Record<string, CategoryKey> = {
+  hardware: "hardware",
+  software: "software",
+  iot: "iot",
+  embedded: "embedded",
+  aiml: "aiml",
+  ai: "aiml",
+  robotics: "robotics",
+  web: "web",
+  mobile: "mobile",
+  cloud: "cloud",
+  cybersecurity: "cybersecurity",
+  security: "cybersecurity",
+};
+
+function MarketplaceContent() {
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [projects, setProjects]                     = useState<Project[]>([]);
+  const [userOrders, setUserOrders]                 = useState<Order[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<CategoryKey[]>([]);
   const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery]               = useState("");
@@ -22,7 +43,106 @@ export default function MarketplacePage() {
   const [showMobileFilters, setShowMobileFilters]   = useState(false);
   const [selectedProject, setSelectedProject]       = useState<Project | null>(null);
 
-  useEffect(() => { getPublicProjects().then(setProjects); }, []);
+  // Sync category & search query from URL search parameters
+  useEffect(() => {
+    const catParam = searchParams.get("category");
+    if (catParam) {
+      const mapped = CATEGORY_MAP[catParam.toLowerCase()];
+      if (mapped) {
+        setSelectedCategories([mapped]);
+      }
+    }
+
+    const qParam = searchParams.get("search");
+    if (qParam) {
+      setSearchQuery(qParam);
+    }
+  }, [searchParams]);
+
+  // Sync selected project from URL parameter once projects are loaded
+  useEffect(() => {
+    const projParam = searchParams.get("project");
+    if (projParam && projects.length > 0) {
+      const matched = projects.find(p => p.id === projParam);
+      if (matched) {
+        setSelectedProject(matched);
+      }
+    }
+  }, [searchParams, projects]);
+
+  useEffect(() => {
+    const fetchProjects = () => {
+      getPublicProjects().then(setProjects);
+    };
+
+    fetchProjects();
+
+    window.addEventListener("edunova_projects_updated", fetchProjects);
+    window.addEventListener("storage", fetchProjects);
+
+    const projectPoll = setInterval(() => {
+      if (typeof document !== "undefined" && !document.hidden) fetchProjects();
+    }, 30000);
+
+    return () => {
+      clearInterval(projectPoll);
+      window.removeEventListener("edunova_projects_updated", fetchProjects);
+      window.removeEventListener("storage", fetchProjects);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setUserOrders([]);
+      return;
+    }
+
+    const fetchOrders = () => {
+      getOrdersByUser(user.id).then(setUserOrders);
+    };
+
+    fetchOrders();
+
+    window.addEventListener("edunova_orders_updated", fetchOrders);
+    window.addEventListener("storage", fetchOrders);
+
+    const orderPoll = setInterval(() => {
+      if (typeof document !== "undefined" && !document.hidden) fetchOrders();
+    }, 30000);
+
+    return () => {
+      clearInterval(orderPoll);
+      window.removeEventListener("edunova_orders_updated", fetchOrders);
+      window.removeEventListener("storage", fetchOrders);
+    };
+  }, [user?.id]);
+
+  const getProjectUserOrderStatus = (project: Project): {
+    status: "owned" | "advance_paid" | "pending" | "none";
+    order?: Order;
+  } => {
+    if (!user || userOrders.length === 0) return { status: "none" };
+    const pTitle = (project.title || "").trim().toLowerCase();
+    const matched = userOrders.filter(
+      o => o.projectId === project.id || (o.projectTitle && o.projectTitle.trim().toLowerCase() === pTitle)
+    );
+    if (matched.length === 0) return { status: "none" };
+
+    const fullBuyApproved = matched.find(
+      o => o.status === "approved" && o.orderType !== "advance_payment"
+    );
+    if (fullBuyApproved) return { status: "owned", order: fullBuyApproved };
+
+    const advanceApproved = matched.find(
+      o => o.status === "approved" && o.orderType === "advance_payment"
+    );
+    if (advanceApproved) return { status: "advance_paid", order: advanceApproved };
+
+    const pendingOrder = matched.find(o => o.status === "pending");
+    if (pendingOrder) return { status: "pending", order: pendingOrder };
+
+    return { status: "none" };
+  };
 
   const toggleCategory    = (id: CategoryKey) => setSelectedCategories(p => p.includes(id) ? p.filter(c => c !== id) : [...p, id]);
   const toggleSubCategory = (id: string)      => setSelectedSubCategories(p => p.includes(id) ? p.filter(s => s !== id) : [...p, id]);
@@ -206,10 +326,23 @@ export default function MarketplacePage() {
                   </div>
 
                   {(() => {
+                    const orderInfo = getProjectUserOrderStatus(project);
                     const isReady = isProjectReadyToDownload(project);
                     return (
                       <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                        {isReady ? (
+                        {orderInfo.status === "owned" ? (
+                          <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold tracking-wider uppercase flex items-center gap-1 shadow-[0_0_10px_rgba(16,185,129,0.25)]">
+                            <CheckCircle className="w-3 h-3 text-emerald-400" /> ✅ Owned / Purchased
+                          </span>
+                        ) : orderInfo.status === "advance_paid" ? (
+                          <span className="text-[9px] px-2 py-0.5 rounded bg-gradient-to-r from-amber-500/20 to-indigo-500/20 text-amber-300 border border-amber-500/40 font-bold tracking-wider uppercase flex items-center gap-1 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                            <Rocket className="w-3 h-3 text-amber-400" /> 🔨 Build in Progress (25% Paid)
+                          </span>
+                        ) : orderInfo.status === "pending" ? (
+                          <span className="text-[9px] px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 font-bold tracking-wider uppercase flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-yellow-400" /> ⏳ Order Placed (Pending)
+                          </span>
+                        ) : isReady ? (
                           <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold tracking-wider uppercase">
                             ⚡ Instant Download
                           </span>
@@ -260,17 +393,26 @@ export default function MarketplacePage() {
 
                   {(() => {
                     const isReady = isProjectReadyToDownload(project);
+                    const orderInfo = getProjectUserOrderStatus(project);
                     return (
                       <div className="flex items-center justify-between pt-3 border-t border-white/[0.05]">
                         <div>
                           <span className="text-base font-bold text-amber-500">
                             ₹{(project.price || 0).toLocaleString("en-IN")}
                           </span>
-                          {!isReady && (
+                          {orderInfo.status === "owned" ? (
+                            <p className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                              <CheckCircle className="w-3 h-3" /> Fully Purchased
+                            </p>
+                          ) : orderInfo.status === "advance_paid" ? (
+                            <p className="text-[10px] text-amber-300 font-bold flex items-center gap-1">
+                              <Rocket className="w-3 h-3" /> 25% Advance Paid
+                            </p>
+                          ) : !isReady ? (
                             <p className="text-[10px] text-amber-400/80 font-medium">
                               ₹{Math.round((project.price || 0) * 0.25).toLocaleString("en-IN")} to start
                             </p>
-                          )}
+                          ) : null}
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
@@ -279,9 +421,34 @@ export default function MarketplacePage() {
                               e.stopPropagation();
                               setSelectedProject(project);
                             }}
-                            className={!isReady ? "border-amber-500/40 text-amber-300 hover:bg-amber-500/10" : ""}
+                            className={
+                              orderInfo.status === "owned"
+                                ? "bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                                : orderInfo.status === "advance_paid"
+                                ? "bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-600 hover:to-indigo-700 text-white font-bold shadow-[0_0_15px_rgba(245,158,11,0.25)]"
+                                : orderInfo.status === "pending"
+                                ? "bg-yellow-600/30 text-yellow-300 border border-yellow-500/40 font-bold"
+                                : !isReady
+                                ? "border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                                : ""
+                            }
                           >
-                            {!isReady ? (
+                            {orderInfo.status === "owned" ? (
+                              <>
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                Owned • View
+                              </>
+                            ) : orderInfo.status === "advance_paid" ? (
+                              <>
+                                <Rocket className="w-3.5 h-3.5" />
+                                Track Build
+                              </>
+                            ) : orderInfo.status === "pending" ? (
+                              <>
+                                <Clock className="w-3.5 h-3.5" />
+                                Pending Track
+                              </>
+                            ) : !isReady ? (
                               <>
                                 <Rocket className="w-3.5 h-3.5" />
                                 Order
@@ -373,5 +540,19 @@ export default function MarketplacePage() {
         <ProjectDetailModal project={selectedProject} onClose={() => setSelectedProject(null)} />
       )}
     </div>
+  );
+}
+
+export default function MarketplacePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#070913]">
+          <div className="w-9 h-9 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
+        </div>
+      }
+    >
+      <MarketplaceContent />
+    </Suspense>
   );
 }

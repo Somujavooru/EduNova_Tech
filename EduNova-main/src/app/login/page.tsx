@@ -73,7 +73,7 @@ export default function LoginPage() {
     if (err) {
       setResendMessage(`Failed: ${err}`);
     } else {
-      setResendMessage("Verification link sent! Check your inbox & spam folder.");
+      setResendMessage("Verification link sent! Please check your Inbox and Spam / Junk folder.");
       setResendCooldown(60);
     }
     setIsResending(false);
@@ -91,48 +91,48 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-5rem)] flex items-center justify-center px-4 py-8 md:py-16">
+    <div className="relative min-h-[calc(100vh-5rem)] flex items-center justify-center px-4 py-2 sm:py-3 lg:py-4">
       {/* ── Interactive Living Cyber Portal Canvas & Solar Core ── */}
       <LoginBackground />
 
-      <div className="relative z-10 w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      <div className="relative z-10 w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-center">
         
         {/* Left Column: Visual Showcase (Visible on lg screens) */}
-        <div className="hidden lg:flex lg:col-span-6 flex-col justify-between pr-4 space-y-8">
+        <div className="hidden lg:flex lg:col-span-6 flex-col justify-between pr-2 space-y-4 xl:space-y-5">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium mb-3">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Verified Student Project Marketplace</span>
             </div>
 
-            <h1 className="text-4xl xl:text-5xl font-black text-white tracking-tight leading-[1.15] mb-4">
+            <h1 className="text-2xl sm:text-3xl xl:text-4xl font-black text-white tracking-tight leading-[1.15] mb-2 xl:mb-3">
               Build your degree project with{" "}
               <span className="bg-gradient-to-r from-amber-400 via-amber-300 to-orange-400 bg-clip-text text-transparent">
                 confidence.
               </span>
             </h1>
 
-            <p className="text-stone-400 text-base leading-relaxed mb-6">
+            <p className="text-stone-400 text-xs sm:text-sm leading-relaxed mb-3 xl:mb-4">
               Access 500+ production-grade engineering projects with full verified source code, circuit schematics, hardware lists, and defense-ready PPTs.
             </p>
 
             {/* Feature highlights */}
-            <div className="space-y-3.5">
-              <div className="flex items-center gap-3 text-sm text-stone-300">
-                <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <div className="space-y-2 xl:space-y-2.5">
+              <div className="flex items-center gap-2.5 text-xs sm:text-[13px] text-stone-300">
+                <div className="w-5 h-5 rounded-md bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
                 <span>Tested source code with 100% bug-free guarantee</span>
               </div>
-              <div className="flex items-center gap-3 text-sm text-stone-300">
-                <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
-                  <Code2 className="w-4 h-4 text-amber-400" />
+              <div className="flex items-center gap-2.5 text-xs sm:text-[13px] text-stone-300">
+                <div className="w-5 h-5 rounded-md bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+                  <Code2 className="w-3.5 h-3.5 text-amber-400" />
                 </div>
                 <span>Complete documentation, viva Q&A, and synopses</span>
               </div>
-              <div className="flex items-center gap-3 text-sm text-stone-300">
-                <div className="w-6 h-6 rounded-lg bg-sky-500/15 border border-sky-500/30 flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-4 h-4 text-sky-400" />
+              <div className="flex items-center gap-2.5 text-xs sm:text-[13px] text-stone-300">
+                <div className="w-5 h-5 rounded-md bg-sky-500/15 border border-sky-500/30 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
                 </div>
                 <span>Direct mentor support & custom build assistance</span>
               </div>
@@ -140,120 +140,125 @@ export default function LoginPage() {
           </div>
 
           {/* Testimonial / Social proof badge */}
-          <div className="p-4 rounded-xl bg-stone-900/60 border border-white/10 backdrop-blur-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-sm">
-                <GraduationCap className="w-5 h-5" />
+          <div className="p-3 xl:p-3.5 rounded-xl bg-stone-900/60 border border-white/10 backdrop-blur-sm">
+            <div className="flex items-center gap-2.5 mb-1.5">
+              <div className="w-7.5 h-7.5 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-xs shrink-0">
+                <GraduationCap className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-white">Raghav M. — VTU Engineering</p>
-                <p className="text-[11px] text-stone-400">Final Year IoT Project • 1st Prize Winner</p>
+                <p className="text-xs font-semibold text-white leading-tight">Raghav M. — VTU Engineering</p>
+                <p className="text-[10.5px] text-stone-400 leading-tight">Final Year IoT Project • 1st Prize Winner</p>
               </div>
             </div>
-            <p className="text-xs text-stone-300 italic">
-              &ldquo;EduNova saved our team weeks of work. The code, hardware pinouts, and PPT were so thorough that our viva went flawlessly!&rdquo;
+            <p className="text-[11px] xl:text-xs text-stone-300 italic leading-snug">
+              &ldquo;EduNova Forge saved our team weeks of work. The code, hardware pinouts, and PPT were so thorough that our viva went flawlessly!&rdquo;
             </p>
           </div>
         </div>
 
         {/* Right Column: Modern Login Card */}
         <div className="w-full lg:col-span-6 flex justify-center">
-          <div className="w-full max-w-md bg-stone-950/90 border border-amber-500/40 rounded-2xl p-6 sm:p-8 backdrop-blur-2xl shadow-[0_0_60px_-10px_rgba(245,158,11,0.35)] relative overflow-hidden ring-1 ring-amber-500/25">
+          <div className="w-full max-w-md bg-stone-950/90 border border-amber-500/40 rounded-2xl p-5 sm:p-6 xl:p-7 backdrop-blur-2xl shadow-[0_0_60px_-10px_rgba(245,158,11,0.35)] relative overflow-hidden ring-1 ring-amber-500/25">
             {/* Top decorative glow bar */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
 
-            <div className="mb-6">
-              <div className="inline-block lg:hidden mb-3">
-                <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-medium">
-                  EduNova Student Hub
+            <div className="mb-4">
+              <div className="inline-block lg:hidden mb-2">
+                <span className="px-2.5 py-1 rounded-full bg-stone-900/80 border border-white/10 text-[11px] font-medium inline-flex items-center gap-1">
+                  <span className="text-[#00e5ff] font-bold drop-shadow-[0_0_8px_rgba(0,229,255,0.7)]">EduNova</span>
+                  <span className="text-[#ff7828] font-bold drop-shadow-[0_0_8px_rgba(255,120,40,0.7)]">Forge</span>
+                  <span className="text-stone-300">Student Hub</span>
                 </span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
                 Welcome back
               </h2>
-              <p className="text-stone-400 text-sm mt-1">
+              <p className="text-stone-400 text-xs sm:text-sm mt-0.5">
                 Log in to access your projects and dashboard
               </p>
             </div>
 
-            <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+            <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
               {/* Unverified Email Warning Banner */}
               {authError === "EMAIL_NOT_VERIFIED" ? (
-                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-stone-200 text-sm space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
-                      <MailCheck className="w-4 h-4" />
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-stone-200 text-xs space-y-2">
+                  <div className="flex items-start gap-2.5">
+                    <div className="p-1 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                      <MailCheck className="w-3.5 h-3.5" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-amber-400">Email Verification Required</h4>
-                      <p className="text-xs text-stone-400 mt-1 leading-relaxed">
-                        Your account was created, but your email has not been verified yet. Check your inbox & spam folder for the activation link.
+                      <h4 className="font-semibold text-amber-400 text-xs">Email Verification Required</h4>
+                      <p className="text-[11px] text-stone-300 mt-0.5 leading-relaxed">
+                        Your account was created, but your email has not been verified yet.
+                      </p>
+                      <p className="text-[10.5px] text-amber-300/95 mt-1 font-medium bg-amber-500/10 p-1.5 rounded-lg border border-amber-500/30">
+                        ⚠️ Please check your <strong>Inbox</strong>, <strong>Spam</strong>, or <strong>Junk</strong> folder for the activation email from EduNova Forge.
                       </p>
                     </div>
                   </div>
-                  <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between">
-                    <span className="text-xs text-stone-400">Didn&apos;t get the email?</span>
+                  <div className="pt-1.5 border-t border-amber-500/20 flex items-center justify-between">
+                    <span className="text-[11px] text-stone-400">Didn&apos;t get the email?</span>
                     <button
                       type="button"
                       onClick={handleResendVerification}
                       disabled={isResending || resendCooldown > 0}
-                      className="text-xs font-semibold text-amber-400 hover:text-amber-300 underline disabled:opacity-50 transition-colors"
+                      className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 underline disabled:opacity-50 transition-colors"
                     >
                       {isResending ? "Sending..." : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend verification link"}
                     </button>
                   </div>
                   {resendMessage && (
-                    <p className="text-xs text-green-400 font-medium">{resendMessage}</p>
+                    <p className="text-[11px] text-green-400 font-medium">{resendMessage}</p>
                   )}
                 </div>
               ) : authError ? (
-                <div className="p-3.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm flex items-center gap-2.5">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                <div className="p-2.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                   <span>{authError}</span>
                 </div>
               ) : null}
 
               {/* Email Input */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-stone-300">Email Address</label>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-medium text-stone-300">Email Address</label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-stone-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Mail className="w-3.5 h-3.5 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full bg-stone-950/70 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white text-sm placeholder:text-stone-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all"
+                    className="w-full bg-stone-950/70 border border-white/10 rounded-xl pl-9 pr-3 py-2 sm:py-2.5 text-white text-xs sm:text-sm placeholder:text-stone-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all"
                     placeholder="student@college.edu"
                   />
                 </div>
               </div>
               
               {/* Password Input */}
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-medium text-stone-300">Password</label>
-                  <Link href="/forgot-password" className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
+                  <label className="text-[11px] font-medium text-stone-300">Password</label>
+                  <Link href="/forgot-password" className="text-[11px] text-amber-400 hover:text-amber-300 transition-colors">
                     Forgot password?
                   </Link>
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-stone-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <Lock className="w-3.5 h-3.5 text-stone-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="w-full bg-stone-950/70 border border-white/10 rounded-xl pl-10 pr-10 py-3 text-white text-sm placeholder:text-stone-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all"
+                    className="w-full bg-stone-950/70 border border-white/10 rounded-xl pl-9 pr-9 py-2 sm:py-2.5 text-white text-xs sm:text-sm placeholder:text-stone-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300 transition-colors"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
@@ -262,25 +267,25 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-semibold text-sm shadow-lg shadow-amber-500/20 active:scale-[0.99] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+                className="w-full mt-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold text-xs sm:text-sm shadow-md shadow-amber-500/20 active:scale-[0.99] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     <span>Signing in...</span>
                   </>
                 ) : (
                   <>
                     <span>Sign In</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </>
                 )}
               </button>
               
               {/* Divider */}
-              <div className="relative flex py-2 items-center">
+              <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-white/10"></div>
-                <span className="flex-shrink-0 mx-4 text-stone-500 text-xs uppercase tracking-wider">or continue with</span>
+                <span className="flex-shrink-0 mx-3 text-stone-500 text-[10.5px] uppercase tracking-wider">or continue with</span>
                 <div className="flex-grow border-t border-white/10"></div>
               </div>
               
@@ -289,16 +294,16 @@ export default function LoginPage() {
                 type="button" 
                 onClick={handleGoogleLogin}
                 disabled={isGoogleLoading}
-                className="w-full py-3 px-4 rounded-xl bg-stone-950/60 hover:bg-stone-800/80 border border-white/10 text-stone-200 text-sm font-medium transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                className="w-full py-2.5 px-4 rounded-xl bg-stone-950/60 hover:bg-stone-800/80 border border-white/10 text-stone-200 text-xs sm:text-sm font-medium transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 cursor-pointer"
               >
                 {isGoogleLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
                     <span>Connecting to Google...</span>
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                       <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                       <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -310,7 +315,7 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <div className="mt-6 pt-5 border-t border-white/5 text-center">
+            <div className="mt-3.5 pt-3 border-t border-white/5 text-center">
               <p className="text-stone-400 text-xs">
                 Don&apos;t have an account yet?{" "}
                 <Link href="/signup" className="text-amber-400 hover:text-amber-300 font-semibold underline underline-offset-2">

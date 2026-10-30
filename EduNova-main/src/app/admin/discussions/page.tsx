@@ -32,6 +32,7 @@ import {
 import { getAllProjectsForAdmin, Project } from "@/lib/data/mockProjects";
 import { useAuth } from "@/context/AuthContext";
 import { ProjectDetailModal } from "@/components/ui/ProjectDetailModal";
+import { sendNotification } from "@/lib/notifications";
 
 export default function AdminDiscussionsPage() {
   const { user } = useAuth();
@@ -62,31 +63,36 @@ export default function AdminDiscussionsPage() {
     const unsubscribe = onSnapshot(
       q,
       async (snapshot) => {
-        // Auto-purge test discussions ('shhhh', 'hi', or empty/test messages)
-        const testComments = snapshot.docs.filter((d) => {
-          const txt = (d.data().text || "").trim().toLowerCase();
-          return txt === "shhhh" || txt === "hi" || txt === "hello" || txt === "test" || !txt;
-        });
-
-        if (testComments.length > 0) {
-          try {
-            await Promise.all(testComments.map((d) => deleteDoc(d.ref)));
-          } catch (e) {
-            console.error("Auto-delete test comments error:", e);
-          }
-        }
-
         const list: CommentType[] = [];
         snapshot.forEach((docSnap) => {
-          const txt = (docSnap.data().text || "").trim().toLowerCase();
-          if (txt !== "shhhh" && txt !== "hi" && txt !== "hello" && txt !== "test" && txt) {
-            list.push({ ...docSnap.data(), id: docSnap.id } as CommentType);
+          const data = docSnap.data();
+          if (data && data.text) {
+            list.push({ ...data, id: docSnap.id } as CommentType);
           }
         });
         // Sort newest first
         list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         setComments(list);
         setLoading(false);
+
+        // Mark all viewed comments as seen by admin
+        if (typeof window !== "undefined") {
+          try {
+            const rawDisc = localStorage.getItem("edunova_admin_read_discussions");
+            const discSet = rawDisc ? new Set(JSON.parse(rawDisc)) : new Set();
+            const rawNotif = localStorage.getItem("edunova_admin_read_notifs");
+            const notifSet = rawNotif ? new Set(JSON.parse(rawNotif)) : new Set();
+
+            list.forEach((c) => {
+              discSet.add(c.id);
+              notifSet.add(`admin-cmt-${c.id}`);
+            });
+            localStorage.setItem("edunova_admin_read_discussions", JSON.stringify(Array.from(discSet)));
+            localStorage.setItem("edunova_admin_read_notifs", JSON.stringify(Array.from(notifSet)));
+            window.dispatchEvent(new CustomEvent("edunova_discussions_updated"));
+            window.dispatchEvent(new CustomEvent("edunova_notifications_changed"));
+          } catch {}
+        }
       },
       (err) => {
         console.warn("[Admin Discussions] Snapshot listener notice:", err?.message || err);
@@ -167,11 +173,26 @@ export default function AdminDiscussionsPage() {
       await submitComment({
         projectId: parentComment.projectId,
         userId: user.id || "admin",
-        userName: user.name || "EduNova Admin Team",
+        userName: user.name || "EduNova Forge Admin Team",
         text: replyText.trim(),
         parentId: parentComment.id,
         isAdminReply: true,
       });
+
+      // Send real-time notification to the user
+      const proj = projectMap.get(parentComment.projectId);
+      const targetEmail = (parentComment as any).userEmail || (parentComment.userName === "Krutika S K" ? "krutikakanade2@gmail.com" : "");
+      if (targetEmail) {
+        sendNotification("discussion_reply", {
+          userEmail: targetEmail,
+          userName: parentComment.userName,
+          projectTitle: proj?.title || "Project Discussion",
+          text: replyText.trim(),
+          projectId: parentComment.projectId,
+          targetUrl: `/projects/${parentComment.projectId}?tab=discussion`,
+        });
+      }
+
       setReplyText("");
       setReplyingToId(null);
     } catch (e) {

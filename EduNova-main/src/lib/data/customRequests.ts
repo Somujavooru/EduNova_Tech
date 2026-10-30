@@ -4,6 +4,7 @@ import {
 } from "firebase/firestore";
 import { withRetry } from "../withRetry";
 import { logger } from "../logger";
+import { generateId } from "@/lib/idUtils";
 
 // Recursively strip undefined values from an object before sending to Firestore.
 // Firestore rejects `undefined` field values in updateDoc/setDoc calls.
@@ -54,6 +55,7 @@ export interface CustomRequest {
   userId: string;
   userName: string;
   userEmail: string;
+  userPhone?: string;
   projectTitle: string;
   description: string;
   requiredTech?: string; // Optional
@@ -78,6 +80,15 @@ export interface CustomRequest {
   };
   createdAt: string;
   updatedAt: string;
+}
+
+export function notifyRequestsSync() {
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent("edunova_requests_updated"));
+      localStorage.setItem("edunova_requests_sync_time", Date.now().toString());
+    } catch {}
+  }
 }
 
 const COLLECTION_NAME = "custom_requests";
@@ -167,6 +178,7 @@ export const submitCustomRequest = async (
     });
 
     await setDoc(docRef, newReq);
+    notifyRequestsSync();
     logger.log("[CustomRequests] Successfully submitted request:", id);
     return newReq;
   } catch (err: unknown) {
@@ -192,6 +204,7 @@ export const updateCustomRequestStatus = async (id: string, newStatus: CustomReq
     data.updatedAt = new Date().toISOString();
 
     await updateDoc(docRef, stripUndefined({ ...data }));
+    notifyRequestsSync();
     return data;
   } catch (err) {
     console.error("Firebase Error updating custom request status:", err);
@@ -210,7 +223,7 @@ export const addNegotiationOffer = async (id: string, offer: Omit<NegotiationOff
     
     const newOffer: NegotiationOffer = {
       ...offer,
-      id: `OFFER-${crypto.randomUUID().replace(/-/g, "").substring(0, 10).toUpperCase()}`,
+      id: generateId("OFFER"),
       createdAt: new Date().toISOString()
     };
     
@@ -219,6 +232,7 @@ export const addNegotiationOffer = async (id: string, offer: Omit<NegotiationOff
     data.updatedAt = new Date().toISOString();
 
     await updateDoc(docRef, stripUndefined({ ...data }));
+    notifyRequestsSync();
     return data;
   } catch (err) {
     console.error("Firebase Error adding negotiation offer:", err);
@@ -262,6 +276,7 @@ export const updateProjectTracking = async (
     data.updatedAt = new Date().toISOString();
 
     await updateDoc(docRef, stripUndefined({ ...data }));
+    notifyRequestsSync();
     return data;
   } catch (err) {
     console.error("Firebase Error updating project tracking:", err);
@@ -291,6 +306,7 @@ export const updateCustomRequestFields = async (
     };
 
     await updateDoc(docRef, stripUndefined({ ...updatedData }));
+    notifyRequestsSync();
     return updatedData;
   } catch (err) {
     console.error("[CustomRequests] Error updating custom request fields:", err);
@@ -302,6 +318,7 @@ export const deleteCustomRequest = async (id: string): Promise<boolean> => {
   try {
     if (!id) return false;
     await deleteDoc(doc(db, COLLECTION_NAME, id));
+    notifyRequestsSync();
     return true;
   } catch (err) {
     console.error("[CustomRequests] Firebase error deleting request:", err);
@@ -314,6 +331,7 @@ export const clearAllCustomRequests = async (): Promise<boolean> => {
     const snap = await getDocs(collection(db, COLLECTION_NAME));
     const deletePromises = snap.docs.map(d => deleteDoc(d.ref));
     await Promise.all(deletePromises);
+    notifyRequestsSync();
     return true;
   } catch (err) {
     console.error("[CustomRequests] Firebase error clearing all requests:", err);

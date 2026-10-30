@@ -1,17 +1,19 @@
 "use client";
 import { useRouter } from "next/navigation";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { getAllCustomRequests, updateCustomRequestStatus, addNegotiationOffer, updateProjectTracking, deleteCustomRequest, clearAllCustomRequests, CustomRequest, CustomRequestStatus, NegotiationOffer } from "@/lib/data/customRequests";
+import { getAllCustomRequests, updateCustomRequestStatus, updateCustomRequestFields, addNegotiationOffer, updateProjectTracking, deleteCustomRequest, clearAllCustomRequests, CustomRequest, CustomRequestStatus, NegotiationOffer } from "@/lib/data/customRequests";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 import { sendNotification } from "@/lib/notifications";
 import { convertRequestToMarketplaceProject } from "@/lib/data/projectIntegration";
 import { ProjectTracker, DEFAULT_MILESTONES } from "@/components/ui/ProjectTracker";
 import {
   FileQuestion, Clock, CheckCircle, XCircle, Search, Eye,
-  Calendar, IndianRupee, Code, FileText, User, Mail, Link as LinkIcon, Loader2, MessageSquare, Send, Rocket, Truck, ShoppingBag, Shield, Trash2
+  Calendar, IndianRupee, Code, FileText, User, Mail, Phone, Link as LinkIcon, Loader2, MessageSquare, Send, Rocket, Truck, ShoppingBag, Shield, Trash2
 } from "lucide-react";
 
 export default function AdminCustomRequestsPage() {
@@ -29,30 +31,63 @@ export default function AdminCustomRequestsPage() {
   const [driveUrlInput, setDriveUrlInput] = useState("");
   const [demoVideoUrlInput, setDemoVideoUrlInput] = useState("");
 
-  useEffect(() => {
-    fetchRequests();
-  }, []);
-
-  const fetchRequests = async () => {
-    setIsLoading(true);
-    setError(null);
+  const fetchRequests = useCallback(async () => {
     try {
-      const PURGE_FLAG = "edunova_initial_requests_purged_flag_v1";
-      if (typeof window !== "undefined" && !sessionStorage.getItem(PURGE_FLAG)) {
-        await clearAllCustomRequests();
-        sessionStorage.setItem(PURGE_FLAG, "true");
-        setRequests([]);
-      } else {
-        const data = await getAllCustomRequests();
-        setRequests(data);
-      }
+      const data = await getAllCustomRequests();
+      setRequests(data);
+      setIsLoading(false);
+      setSelectedRequest((prev) => (prev ? data.find((r) => r.id === prev.id) || prev : null));
     } catch (err: any) {
-      console.error("Admin fetch requests failed:", err);
-      setRequests([]);
-    } finally {
+      console.warn("Admin fetch requests notice:", err);
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let unsub = () => {};
+
+    // Initial fetch
+    fetchRequests();
+
+    // 1. Live real-time Firestore listener on custom_requests
+    try {
+      unsub = onSnapshot(
+        collection(db, "custom_requests"),
+        (snap) => {
+          const list = snap.docs
+            .map((d) => d.data() as CustomRequest)
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          setRequests(list);
+          setIsLoading(false);
+          // Update currently viewed request immediately if updated
+          if (selectedRequest) {
+            const fresh = list.find((r) => r.id === selectedRequest.id);
+            if (fresh) setSelectedRequest(fresh);
+          }
+        },
+        (err) => {
+          console.warn("[AdminCustomRequests] Firestore listener notice (using polling):", err?.message);
+        }
+      );
+    } catch (e) {}
+
+    // 2. Cross-tab and event synchronization
+    const handleSync = () => {
+      fetchRequests();
+    };
+    window.addEventListener("edunova_requests_updated", handleSync);
+    window.addEventListener("storage", handleSync);
+
+    // 3. Fast 3-second live polling heartbeat
+    const liveTimer = setInterval(fetchRequests, 3000);
+
+    return () => {
+      unsub();
+      clearInterval(liveTimer);
+      window.removeEventListener("edunova_requests_updated", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
+  }, [selectedRequest?.id]);
 
   const handleStatusChange = async (id: string, newStatus: CustomRequestStatus) => {
     setIsUpdating(true);
@@ -294,6 +329,12 @@ export default function AdminCustomRequestsPage() {
                         <User className="w-4 h-4 text-[var(--color-neon-purple)]" />
                         {req.userName}
                       </div>
+                      {req.userPhone && (
+                        <div className="flex items-center gap-2 text-sm text-emerald-400 font-medium">
+                          <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>{req.userPhone}</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 text-sm text-gray-300">
                         <IndianRupee className="w-4 h-4 text-green-400" />
                         {req.negotiationHistory && req.negotiationHistory.length > 0 ? (
@@ -435,6 +476,22 @@ export default function AdminCustomRequestsPage() {
                         <Mail className="w-4 h-4 text-[var(--color-neon-blue)]" />
                         <a href={`mailto:${selectedRequest.userEmail}`} className="hover:underline">{selectedRequest.userEmail}</a>
                       </div>
+                      {selectedRequest.userPhone && (
+                        <div className="flex items-center justify-between text-sm pt-1">
+                          <div className="flex items-center gap-3 text-gray-300">
+                            <Phone className="w-4 h-4 text-emerald-400" />
+                            <a href={`tel:${selectedRequest.userPhone}`} className="hover:underline text-white font-medium">{selectedRequest.userPhone}</a>
+                          </div>
+                          <a
+                            href={`https://wa.me/${selectedRequest.userPhone.replace(/\D/g, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition"
+                          >
+                            <span>WhatsApp</span>
+                          </a>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="bg-white/5 border border-white/10 p-4 sm:p-5 rounded-2xl flex flex-col justify-center gap-4">
@@ -748,11 +805,65 @@ export default function AdminCustomRequestsPage() {
                                 <Button
                                   size="sm"
                                   onClick={async () => {
-                                    // Strictly check if final payment is actually verified in the DB/state
-                                    // But since the UI state says it's not verified, we show an error.
-                                    alert("User payment is not fully approved yet. Please wait for the user to make the 75% final payment, and approve it in the Admin Payments dashboard.");
+                                    if (!confirm(`Are you sure you want to verify the 75% final payment for "${selectedRequest.projectTitle}" and grant the user full access?`)) return;
+                                    try {
+                                      const agreedPrice = selectedRequest.negotiationHistory?.[selectedRequest.negotiationHistory.length - 1]?.price || selectedRequest.budget;
+                                      const finalAmount = Math.round(agreedPrice * 0.75);
+                                      const updatedReq = await updateCustomRequestFields(selectedRequest.id, {
+                                        status: "delivered",
+                                        finalPayment: {
+                                          amount: selectedRequest.finalPayment?.amount || finalAmount,
+                                          status: "verified",
+                                          utrNumber: selectedRequest.finalPayment?.utrNumber || "ADMIN-VERIFIED",
+                                          screenshot: selectedRequest.finalPayment?.screenshot || "",
+                                          verifiedAt: new Date().toISOString(),
+                                        },
+                                        trackingHistory: [
+                                          ...(selectedRequest.trackingHistory || []),
+                                          {
+                                            stage: "delivered",
+                                            label: "Project Delivered & Files Unlocked",
+                                            progressPercent: 100,
+                                            notes: "75% final payment verified by admin. Google Drive files and deliverables unlocked.",
+                                            completedAt: new Date().toISOString(),
+                                          }
+                                        ]
+                                      });
+                                      if (updatedReq) {
+                                        setSelectedRequest(updatedReq);
+                                        setRequests(prev => prev.map(r => r.id === updatedReq.id ? updatedReq : r));
+                                      }
+                                      sendNotification("project_delivered", {
+                                        projectTitle: selectedRequest.projectTitle,
+                                        userEmail: selectedRequest.userEmail,
+                                        userName: selectedRequest.userName,
+                                      });
+                                      sendNotification("custom_project_access_granted", {
+                                        projectTitle: selectedRequest.projectTitle,
+                                        userEmail: selectedRequest.userEmail,
+                                        userName: selectedRequest.userName,
+                                      });
+                                      // Sync orders collection & unlock referral code
+                                      try {
+                                        const { getAllOrders, updateOrderStatus } = await import("@/lib/data/orders");
+                                        const allOrders = await getAllOrders();
+                                        const matchedOrder = allOrders.find(o => o.customRequestId === selectedRequest.id && (o.orderType === "final_payment" || o.status === "pending"));
+                                        if (matchedOrder && matchedOrder.status !== "approved") {
+                                          await updateOrderStatus(matchedOrder.id, "approved");
+                                        }
+                                        const { unlockUserReferralCode } = await import("@/lib/data/referrals");
+                                        if (selectedRequest.userId) {
+                                          await unlockUserReferralCode(selectedRequest.userId);
+                                        }
+                                      } catch {}
+
+                                      alert("✅ Final payment verified! User now has full access to the project files.");
+                                    } catch (err: unknown) {
+                                      const msg = err instanceof Error ? err.message : "Failed to verify payment";
+                                      alert("Error: " + msg);
+                                    }
                                   }}
-                                  className="bg-red-500/20 text-red-400 hover:bg-red-500/30 whitespace-nowrap"
+                                  className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 whitespace-nowrap"
                                 >
                                   Verify Payment & Give Access
                                 </Button>

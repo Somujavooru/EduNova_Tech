@@ -292,7 +292,7 @@ export default function AdminMessagesPage() {
                         </div>
                         <div>
                           <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider block">
-                            {selectedMessage.repliedBy || "EduNova Support Admin"} (Replied to User)
+                            {selectedMessage.repliedBy || "EduNova Forge Support Admin"} (Replied to User)
                           </span>
                           <span className="text-[10px] text-gray-400">Delivered &amp; Visible on User's Dashboard</span>
                         </div>

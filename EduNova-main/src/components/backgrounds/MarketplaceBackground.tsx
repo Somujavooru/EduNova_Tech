@@ -3,11 +3,7 @@ import { useEffect, useRef } from "react";
 
 /* ──────────────────────────────────────────────────────────────────────────────
    MarketplaceBackground — Immersive Cyber Blueprint & Nebula Canvas
-   Features:
-     - Multi-layer deep space & cybernetic grid overlay
-     - Glowing ambient nebulae (Cyan, Amber, Violet)
-     - Interactive micro-particle constellation nodes
-     - Subtle blueprint circuit traces & grid lines
+   Optimized for silky-smooth 60/120 FPS marketplace scrolling
    ────────────────────────────────────────────────────────────────────────────── */
 
 interface Particle {
@@ -34,19 +30,22 @@ export function MarketplaceBackground() {
     let raf: number;
     let W = (canvas.width = window.innerWidth);
     let H = (canvas.height = window.innerHeight);
+    let isVisible = true;
+    let isScrolling = false;
+    let scrollTimer: NodeJS.Timeout;
 
     let particles: Particle[] = [];
 
     const init = () => {
       W = canvas.width = window.innerWidth;
       H = canvas.height = window.innerHeight;
-      const count = Math.min(Math.floor((W * H) / 18000), 55);
-      particles = Array.from({ length: count }, () => ({
+      const count = Math.min(Math.floor((W * H) / 38000), 28);
+      particles = Array.from({ length: Math.max(count, 18) }, () => ({
         x: Math.random() * W,
         y: Math.random() * H,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        radius: Math.random() * 2 + 0.8,
+        vx: (Math.random() - 0.5) * 0.28,
+        vy: (Math.random() - 0.5) * 0.28,
+        radius: Math.random() * 1.8 + 0.8,
         alpha: Math.random() * 0.45 + 0.15,
         color: COLORS[Math.floor(Math.random() * COLORS.length)],
       }));
@@ -54,13 +53,35 @@ export function MarketplaceBackground() {
 
     init();
     const handleResize = () => init();
-    window.addEventListener("resize", handleResize);
+    const onVisibilityChange = () => {
+      isVisible = !document.hidden;
+    };
+    const onScroll = () => {
+      isScrolling = true;
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        isScrolling = false;
+      }, 100);
+    };
+
+    window.addEventListener("resize", handleResize, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    const maxDist = 120;
+    const maxDistSq = maxDist * maxDist;
 
     const render = () => {
-      ctx.clearRect(0, 0, W, H);
+      if (!isVisible) {
+        raf = requestAnimationFrame(render);
+        return;
+      }
 
-      // Draw particle constellation connections
-      for (let i = 0; i < particles.length; i++) {
+      ctx.clearRect(0, 0, W, H);
+      const len = particles.length;
+
+      // Draw particle positions
+      for (let i = 0; i < len; i++) {
         const p1 = particles[i];
         p1.x += p1.vx;
         p1.y += p1.vy;
@@ -70,27 +91,30 @@ export function MarketplaceBackground() {
         if (p1.y < 0) p1.y = H;
         if (p1.y > H) p1.y = 0;
 
-        // Draw particle
         ctx.beginPath();
         ctx.arc(p1.x, p1.y, p1.radius, 0, Math.PI * 2);
         ctx.fillStyle = p1.color;
         ctx.globalAlpha = p1.alpha;
         ctx.fill();
 
-        // Connect nearby particles with subtle circuit lines
-        for (let j = i + 1; j < particles.length; j++) {
-          const p2 = particles[j];
-          const dx = p1.x - p2.x;
-          const dy = p1.y - p2.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 130) {
-            ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = p1.color;
-            ctx.globalAlpha = (1 - dist / 130) * 0.15;
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
+        // Connect nearby particles with squared distance check
+        if (!isScrolling) {
+          for (let j = i + 1; j < len; j++) {
+            const p2 = particles[j];
+            const dx = p1.x - p2.x;
+            const dy = p1.y - p2.y;
+            const distSq = dx * dx + dy * dy;
+
+            if (distSq < maxDistSq) {
+              const dist = Math.sqrt(distSq);
+              ctx.beginPath();
+              ctx.moveTo(p1.x, p1.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.strokeStyle = p1.color;
+              ctx.globalAlpha = (1 - dist / maxDist) * 0.15;
+              ctx.lineWidth = 0.75;
+              ctx.stroke();
+            }
           }
         }
       }
@@ -103,6 +127,9 @@ export function MarketplaceBackground() {
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      clearTimeout(scrollTimer);
       cancelAnimationFrame(raf);
     };
   }, []);

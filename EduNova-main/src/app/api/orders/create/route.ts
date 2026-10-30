@@ -198,12 +198,16 @@ export async function POST(request: Request) {
 
   // ── 4. Compute price SERVER-SIDE (ignore client-supplied amount) ────────
   let baseAmount: number;
+  let verifiedTotalProjectPrice: number = 0;
+  let verifiedAdvanceAmount: number = 0;
+  let verifiedBalanceAmount: number = 0;
   let verifiedTitle = String(projectTitle).slice(0, 200);
   let verifiedCategory = String(projectCategory).slice(0, 100);
   let verifiedSeller = String(sellerName).slice(0, 100);
   let isCatalogBuildOrder = false;
   let catalogProjectForCustomReq: Record<string, any> | null = null;
   let targetCustomReqId: string | null = null;
+  let existingAdvanceOrderId: string | null = null;
 
   if (orderType === "marketplace") {
     console.info(`[Order API Timing] [${Date.now() - reqStart}ms] Stage 4: Reading project catalog for projectId: ${projectId}...`);
@@ -219,6 +223,9 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: "Invalid project price in catalog" }, { status: 400 });
         }
         baseAmount = projData.price;
+        verifiedTotalProjectPrice = projData.price;
+        verifiedAdvanceAmount = projData.price;
+        verifiedBalanceAmount = 0;
         verifiedTitle = String(projData.title || projectTitle).slice(0, 200);
         verifiedCategory = String(projData.category || projectCategory).slice(0, 100);
         verifiedSeller = String(projData.sellerName || sellerName).slice(0, 100);
@@ -228,6 +235,9 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: "Project not found" }, { status: 400 });
         }
         baseAmount = staticProj.price;
+        verifiedTotalProjectPrice = staticProj.price;
+        verifiedAdvanceAmount = staticProj.price;
+        verifiedBalanceAmount = 0;
         verifiedTitle = String(staticProj.title || projectTitle).slice(0, 200);
         verifiedCategory = String(staticProj.category || projectCategory).slice(0, 100);
         verifiedSeller = String(staticProj.sellerName || sellerName).slice(0, 100);
@@ -241,7 +251,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: (projErr as Error)?.message || "Failed to fetch project catalog" }, { status: 500 });
     }
   } else if (orderType === "advance_payment") {
-    // ── Milestone Advance Payment (25%): Can be an existing custom request OR a build-on-order catalog project ──
+    // ── Milestone Advance Payment (75%): Can be an existing custom request OR a build-on-order catalog project ──
     const candidateCustomReqId = customRequestId;
     let foundCustomReqDoc = null;
 
@@ -274,12 +284,15 @@ export async function POST(request: Request) {
       if (!Number.isFinite(agreedPrice) || agreedPrice <= 0) {
         return NextResponse.json({ error: "Invalid price on custom request" }, { status: 400 });
       }
-      baseAmount = Math.round(agreedPrice * 0.25);
+      verifiedTotalProjectPrice = agreedPrice;
+      baseAmount = Math.round(agreedPrice * 0.25); // 25% Advance
+      verifiedAdvanceAmount = baseAmount;
+      verifiedBalanceAmount = agreedPrice - baseAmount; // 75% Balance
       verifiedTitle = `Advance (25%): ${reqData.projectTitle || projectTitle}`.slice(0, 200);
       verifiedCategory = "custom_request";
-      verifiedSeller = "EduNova Team";
+      verifiedSeller = "EduNova Forge Team";
     } else {
-      // Build-on-order catalog project: compute 25% price from project catalog
+      // Build-on-order catalog project: compute 25% advance price from project catalog
       console.info(`[Order API Timing] [${Date.now() - reqStart}ms] Stage 4: Verifying build-on-order catalog project: ${projectId}...`);
       try {
         const projSnap = await withTimeout(
@@ -302,7 +315,10 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: "Project not found" }, { status: 400 });
         }
 
-        baseAmount = Math.round(projData.price * 0.25);
+        verifiedTotalProjectPrice = projData.price;
+        baseAmount = Math.round(projData.price * 0.25); // 25% Advance
+        verifiedAdvanceAmount = baseAmount;
+        verifiedBalanceAmount = projData.price - baseAmount; // 75% Balance
         verifiedTitle = `Advance (25%): ${projData.title || projectTitle}`.slice(0, 200);
         verifiedCategory = String(projData.category || projectCategory).slice(0, 100);
         verifiedSeller = String(projData.sellerName || sellerName).slice(0, 100);
@@ -340,10 +356,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Invalid price on custom request" }, { status: 400 });
       }
 
-      baseAmount = Math.round(agreedPrice * 0.75);
-      verifiedTitle = `Final (75%): ${reqData.projectTitle || projectTitle}`.slice(0, 200);
+      if (reqData.orderId) {
+        existingAdvanceOrderId = reqData.orderId;
+      }
+
+      verifiedTotalProjectPrice = agreedPrice;
+      verifiedAdvanceAmount = Math.round(agreedPrice * 0.25);
+      baseAmount = Math.round(agreedPrice * 0.75); // 75% Final Balance
+      verifiedBalanceAmount = baseAmount;
+      verifiedTitle = `Balance (75%): ${reqData.projectTitle || projectTitle}`.slice(0, 200);
       verifiedCategory = "custom_request";
-      verifiedSeller = "EduNova Team";
+      verifiedSeller = "EduNova Forge Team";
     } catch (customErr) {
       console.error(`[Order API Timing] [${Date.now() - reqStart}ms] Stage 4 FAILED: Custom request lookup error:`, customErr);
       return NextResponse.json({ error: (customErr as Error)?.message || "Failed to fetch custom request" }, { status: 500 });
@@ -372,6 +395,15 @@ export async function POST(request: Request) {
   } catch (refErr) {
     console.warn(`[Order API Timing] [${Date.now() - reqStart}ms] Referral check notice:`, refErr);
   }
+
+  // Check if autoApprovePayments is enabled in platform settings
+  let autoApprovePayments = false;
+  try {
+    const settingsSnap = await adminDb.collection("settings").doc("platform").get();
+    if (settingsSnap.exists) {
+      autoApprovePayments = settingsSnap.data()?.autoApprovePayments === true;
+    }
+  } catch {}
 
   // ── 5. Atomic transaction: UTR check + Discount Redemption + Order Creation (with safe Idempotency) ───
   console.info(`[Order API Timing] [${Date.now() - reqStart}ms] Stage 5: Starting atomic Firestore transaction for UTR...`);
@@ -427,9 +459,16 @@ export async function POST(request: Request) {
 
         const finalAmount = Math.max(0, baseAmount - discountApplied);
 
-        // 5. Pre-allocate order document ID
-        const orderRef = adminDb.collection("orders").doc();
+        // 5. Allocate or reuse order document ID
+        const orderRef = existingAdvanceOrderId
+          ? adminDb.collection("orders").doc(existingAdvanceOrderId)
+          : adminDb.collection("orders").doc();
         const orderId = orderRef.id;
+
+        let existingOrderDoc = null;
+        if (existingAdvanceOrderId) {
+          existingOrderDoc = await tx.get(orderRef);
+        }
 
         let effectiveCustomRequestId = customRequestId;
 
@@ -464,8 +503,8 @@ export async function POST(request: Request) {
             trackingHistory: [
               {
                 stage: "planning",
-                label: "Order Placed & Advance Under Verification",
-                progressPercent: 10,
+                label: "Order Placed & 25% Advance Under Verification",
+                progressPercent: 25,
                 notes: "25% advance payment submitted. Waiting for admin approval to commence project development.",
                 completedAt: now,
               }
@@ -525,19 +564,26 @@ export async function POST(request: Request) {
           projectCategory: verifiedCategory,
           sellerName: verifiedSeller,
           amount: finalAmount,
+          totalProjectPrice: verifiedTotalProjectPrice,
+          advanceAmount: verifiedAdvanceAmount,
+          balanceAmount: verifiedBalanceAmount,
+          paymentVerificationStatus: autoApprovePayments ? "approved" : "pending",
+          rejectionReason: null,
+          verifiedBy: autoApprovePayments ? "system_auto_approve" : null,
+          verifiedAt: autoApprovePayments ? now : null,
           discountApplied,
           utrNumber: trimmedUtr,
           paymentMethod: String(paymentMethod).slice(0, 50),
-          paymentScreenshot,
-          status: "pending",
-          deliveryStatus: "pending",
-          buildStage: orderType === "advance_payment" ? "planning" : null,
+          status: autoApprovePayments ? "approved" : "pending",
+          deliveryStatus: autoApprovePayments ? "delivered" : "pending",
+          buildStage: orderType === "advance_payment" ? (autoApprovePayments ? "building" : "planning") : null,
           driveUrl: catalogProjectForCustomReq?.driveUrl || "",
           demoVideoUrl: catalogProjectForCustomReq?.demoVideoUrl || "",
           duplicateUtrWarning: false,
           createdAt: now,
           updatedAt: now,
-          deliveredAt: null,
+          deliveredAt: autoApprovePayments ? now : null,
+          approvedAt: autoApprovePayments ? now : null,
           deadlineDate: null,
         };
 
@@ -547,7 +593,38 @@ export async function POST(request: Request) {
           userId: uid,
           createdAt: FieldValue.serverTimestamp(),
         });
-        tx.set(orderRef, orderData);
+
+        if (existingOrderDoc?.exists) {
+          const existingData = existingOrderDoc.data() || {};
+          const cleanTitle = String(existingData.projectTitle || verifiedTitle)
+            .replace(/^Final \(75%\):\s*/i, "")
+            .replace(/^Balance \(25%\):\s*/i, "")
+            .replace(/^Advance \(25%\):\s*/i, "")
+            .replace(/^Advance \(75%\):\s*/i, "");
+
+          tx.update(orderRef, {
+            amount: (existingData.amount || 0) + finalAmount,
+            balanceAmount: 0,
+            paymentVerificationStatus: "pending",
+            rejectionReason: null,
+            finalPayment: {
+              amount: finalAmount,
+              utrNumber: trimmedUtr,
+              screenshot: paymentScreenshot,
+              status: "pending",
+              discountApplied,
+              submittedAt: now,
+            },
+            projectTitle: cleanTitle,
+            finalUtrNumber: trimmedUtr,
+            paymentScreenshot,
+            status: "pending",
+            buildStage: "ready_for_delivery",
+            updatedAt: now,
+          });
+        } else {
+          tx.set(orderRef, orderData);
+        }
 
         // 7. Atomically redeem discount if applied
         if (discountApplied > 0) {

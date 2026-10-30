@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import { Order } from "@/lib/data/orders";
+import { EF_LOGO_BASE64 } from "@/lib/logoAsset";
 
 function numberToWords(num: number): string {
   if (num === 0) return "Zero Rupees Only";
@@ -137,23 +138,69 @@ export function generateInvoice(order: Order) {
   let y = 14;
 
   // ========== COMPANY HEADER (LEFT) ==========
+  // Official Brand: 3D EF Monogram Symbol Badge + "Edu" (Dark Navy) + "Nova" (Cyan) + "Forge" (Dark Navy)
+  const logoW = 16;
+  const logoH = 13.1;
+  const logoX = margin;
+  const logoY = 8;
+
+  try {
+    // Elegant dark rounded badge container for 3D monogram
+    doc.setFillColor(10, 14, 26); // #0A0E1A
+    doc.roundedRect(logoX, logoY, logoW + 4, logoH + 4, 2.5, 2.5, "F");
+    doc.addImage(EF_LOGO_BASE64, "PNG", logoX + 2, logoY + 2, logoW, logoH);
+  } catch (err) {
+    console.warn("Could not embed EF logo in invoice:", err);
+  }
+
+  const textX = margin + logoW + 8;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
+  doc.setFontSize(20);
+
+  // 1. "Edu" in Deep Navy
   doc.setTextColor(...navyDark);
-  doc.text("EduNova", margin, y);
+  doc.text("Edu", textX, 15);
+  const edunWidth = doc.getTextWidth("Edu");
 
-  doc.setFontSize(8);
+  // 2. "Nova" in Vibrant Electric Cyan
+  doc.setTextColor(0, 180, 216); // #00B4D8 Cyan
+  doc.text("Nova", textX + edunWidth, 15);
+  const novaWidth = doc.getTextWidth("Nova");
+
+  // 3. "Forge" in Deep Navy
+  doc.setTextColor(...navyDark);
+  doc.text("Forge", textX + edunWidth + novaWidth + 1.2, 15);
+
+  // Tagline: DISCOVER • BUILD • BRING IDEAS TO LIFE
+  const tagY = 20.5;
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...royalBlue);
-  doc.text("TECHNOLOGIES PVT. LTD.", margin + 35, y - 0.5);
-
-  y += 6;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(6.2);
   doc.setTextColor(...slateMuted);
-  doc.text("Curated Engineering Project Marketplace", margin, y);
-  y += 5;
-  doc.text("edunovasupport@gmail.com | www.edunova.com", margin, y);
+  doc.text("DISCOVER", textX, tagY);
+  let tagX = textX + doc.getTextWidth("DISCOVER ");
+  doc.setTextColor(0, 180, 216);
+  doc.text("• ", tagX, tagY);
+  tagX += doc.getTextWidth("• ");
+  doc.setTextColor(...slateMuted);
+  doc.text("BUILD", tagX, tagY);
+  tagX += doc.getTextWidth("BUILD ");
+  doc.setTextColor(0, 180, 216);
+  doc.text("• ", tagX, tagY);
+  tagX += doc.getTextWidth("• ");
+  doc.setTextColor(...slateMuted);
+  doc.text("BRING IDEAS TO LIFE", tagX, tagY);
+
+  const compY = 25;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.2);
+  doc.setTextColor(...royalBlue);
+  doc.text("EDUNOVA FORGE TECHNOLOGIES PVT. LTD.", textX, compY);
+
+  const contactY = 29;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6.5);
+  doc.setTextColor(...slateMuted);
+  doc.text("edunovaforgessupport@gmail.com", textX, contactY);
 
   // ========== INVOICE BADGE & DETAILS (RIGHT) ==========
   const rightX = pageWidth - margin;
@@ -310,7 +357,12 @@ export function generateInvoice(order: Order) {
   doc.setTextColor(...navyDark);
   let milestoneText = "Direct Marketplace Purchase (100% Full Access)";
   if (order.orderType === "advance_payment") milestoneText = "Custom Project: 25% Advance Milestone";
-  if (order.orderType === "final_payment") milestoneText = "Custom Project: 75% Final Delivery Milestone";
+  if (order.orderType === "final_payment") {
+    const disc = Number(order.discountApplied ?? (order as any).finalPayment?.discountApplied ?? (order as any).referralDiscount ?? 0);
+    milestoneText = disc > 0
+      ? `Custom Project: 75% Final (INR ${disc} Referral Disc Applied)`
+      : "Custom Project: 75% Final Delivery Milestone";
+  }
   doc.text(milestoneText, rightBoxX + valOffset, y + 28);
 
   y += boxH + 6;
@@ -358,21 +410,32 @@ export function generateInvoice(order: Order) {
   y += thH;
 
   // Financial Milestone & Totals Calculations
+  const discountApplied = Number(
+    order.discountApplied ??
+    (order as any).finalPayment?.discountApplied ??
+    (order as any).referralDiscount ??
+    0
+  );
+
   const currentPaid = Number(order.amount) || 0;
   let totalProjectCost = currentPaid;
   let nextTotalToPay = 0;
   let advancePaid = 0;
+  let base75Balance = 0;
+
+  const totalCostProp = order.totalProjectPrice || (order as any).totalAmount;
 
   if (order.orderType === "advance_payment") {
-    totalProjectCost = currentPaid * 4; // 25% Advance Milestone
+    totalProjectCost = totalCostProp || Math.round((currentPaid + discountApplied) * 4); // 25% Advance Milestone
     advancePaid = currentPaid;
-    nextTotalToPay = currentPaid * 3;   // 75% Remaining
+    nextTotalToPay = Math.max(0, totalProjectCost - (currentPaid + discountApplied));
   } else if (order.orderType === "final_payment") {
-    totalProjectCost = Math.round(currentPaid / 0.75); // 75% Final milestone
-    advancePaid = Math.round(totalProjectCost * 0.25);
+    totalProjectCost = totalCostProp || Math.round((currentPaid + discountApplied) / 0.75); // 75% Final milestone
+    advancePaid = order.advanceAmount || Math.round(totalProjectCost * 0.25);
+    base75Balance = Math.max(0, totalProjectCost - advancePaid);
     nextTotalToPay = 0; // Completed
   } else {
-    totalProjectCost = currentPaid;
+    totalProjectCost = totalCostProp || (currentPaid + discountApplied);
     advancePaid = currentPaid;
     nextTotalToPay = 0;
   }
@@ -380,6 +443,8 @@ export function generateInvoice(order: Order) {
   const fTotalCost = totalProjectCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fPaidAmount = currentPaid.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fAdvancePaid = advancePaid.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fBase75Balance = base75Balance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fDiscountApplied = discountApplied.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fNextToPay = nextTotalToPay.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // Table Row (Generous height so text never touches bottom line)
@@ -417,7 +482,16 @@ export function generateInvoice(order: Order) {
   doc.setTextColor(...slateMuted);
   doc.text(`Category: ${String(order.projectCategory || "Engineering").toUpperCase()}  |  Fulfillment: Digital Download`, x1 + 4, y + 10.5);
   doc.text("Deliverables: Complete Source Code, Circuit Diagrams, Report & PPT", x1 + 4, y + 15);
-  doc.text("License: Academic & Research Evaluation Single-User License", x1 + 4, y + 19.5);
+  
+  if (discountApplied > 0) {
+    doc.setTextColor(...greenDark);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Referral Discount: - INR ${fDiscountApplied} applied on 75% final payment`, x1 + 4, y + 19.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...slateMuted);
+  } else {
+    doc.text("License: Academic & Research Evaluation Single-User License", x1 + 4, y + 19.5);
+  }
 
   // QTY, Rate, Amount (Decimal aligned numbers)
   doc.setFont("helvetica", "normal");
@@ -472,15 +546,25 @@ export function generateInvoice(order: Order) {
   if (order.orderType === "final_payment") {
     renderSummaryRow("Total Project Cost:", `INR ${fTotalCost}`);
     renderSummaryRow("Advance Paid (25%):", `INR ${fAdvancePaid}`);
+    renderSummaryRow("75% Delivery Balance:", `INR ${fBase75Balance}`);
+    if (discountApplied > 0) {
+      renderSummaryRow("Referral Reward Discount:", `- INR ${fDiscountApplied}`, false, true);
+    }
     renderSummaryRow("Paid Amount (Final 75%):", `INR ${fPaidAmount}`, true);
     renderSummaryRow("Next Total Need to be Paid:", "INR 0.00 (Fully Paid)");
   } else if (order.orderType === "advance_payment") {
     renderSummaryRow("Total Project Cost:", `INR ${fTotalCost}`);
+    if (discountApplied > 0) {
+      renderSummaryRow("Referral Reward Discount:", `- INR ${fDiscountApplied}`, false, true);
+    }
     renderSummaryRow("Paid Amount (25% Advance):", `INR ${fPaidAmount}`, true);
     renderSummaryRow("Next Total Need to be Paid:", `INR ${fNextToPay}`);
     renderSummaryRow("Payment Schedule:", "75% Delivery Balance");
   } else {
     renderSummaryRow("Total Project Cost:", `INR ${fTotalCost}`);
+    if (discountApplied > 0) {
+      renderSummaryRow("Referral Reward Discount:", `- INR ${fDiscountApplied}`, false, true);
+    }
     renderSummaryRow("Paid Amount:", `INR ${fPaidAmount}`, true);
     renderSummaryRow("Next Total Need to be Paid:", "INR 0.00 (Fully Paid)");
     renderSummaryRow("Platform & Processing Fee:", "0.00 (Free)");
@@ -502,7 +586,7 @@ export function generateInvoice(order: Order) {
   doc.setFontSize(10.5);
   doc.text(`INR ${fPaidAmount}`, pageWidth - margin - 2, sumY + 6, { align: "right" });
 
-  y = summaryBlockTop + 33;
+  y = Math.max(summaryBlockTop + 34, sumY + 13);
 
   // ========== OFFICIAL STAMP & SIGNATURE SECTION ==========
   // Left: Official Double-Border Paid Seal
@@ -538,10 +622,10 @@ export function generateInvoice(order: Order) {
   doc.setTextColor(...stampColorDark);
   doc.text(
     isApproved
-      ? "EDUNOVA PLATFORM OFFICIAL VERIFIED"
+      ? "EDUNOVA FORGE PLATFORM OFFICIAL VERIFIED"
       : isRejected
-      ? "EDUNOVA PAYMENT VERIFICATION"
-      : "EDUNOVA PAYMENT VERIFICATION",
+      ? "EDUNOVA FORGE PAYMENT VERIFICATION"
+      : "EDUNOVA FORGE PAYMENT VERIFICATION",
     stampCenterX,
     y + 6,
     { align: "center" }
@@ -583,7 +667,7 @@ export function generateInvoice(order: Order) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...navyDark);
-  doc.text("For EDUNOVA TECHNOLOGIES PVT. LTD.", sigX, y + 4);
+  doc.text("For EDUNOVA FORGE TECHNOLOGIES PVT. LTD.", sigX, y + 4);
 
   // Generate and embed realistic handwritten digital vector signature stroke
   const sigDataUrl = generateDigitalSignatureDataUrl();
@@ -628,9 +712,9 @@ export function generateInvoice(order: Order) {
 
   const termLines = [
     "1. License: Project deliverables and source code are licensed for educational and academic research evaluation.",
-    "2. Delivery: Instant download access is permanently activated on the EduNova dashboard (www.edunova.com/dashboard).",
+    "2. Delivery: Instant download access is permanently activated on your EduNova Forge student dashboard.",
     "3. Digital Receipt: Official digitally verified payment receipt issued for online engineering project deliverables.",
-    "4. Support & Queries: For technical support, deployment, or queries, contact edunovasupport@gmail.com."
+    "4. Support & Queries: For technical support, deployment, or queries, contact edunovaforgessupport@gmail.com."
   ];
 
   let termY = y + 9.5;
@@ -655,7 +739,7 @@ export function generateInvoice(order: Order) {
   doc.text(`Generated on: ${new Date().toLocaleString("en-IN")}  |  Page 1 of 1`, pageWidth - margin, footerY, { align: "right" });
 
   // ========== DOWNLOAD PDF FILE ==========
-  const filename = `Edunova-Invoice-${order.id}.pdf`;
+  const filename = `EdunovaForge-Invoice-${order.id}.pdf`;
 
   const blob = doc.output("blob");
 

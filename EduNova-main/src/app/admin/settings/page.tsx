@@ -18,40 +18,56 @@ import {
 import { purgeRejectedProjects } from "@/lib/data/mockProjects";
 import { clearAllOrders } from "@/lib/data/orders";
 
+import { compressImage } from "@/lib/imageUtils";
+
 export default function AdminSettingsPage() {
-  const [siteTitle, setSiteTitle] = useState("EduNova");
-  const [tagline, setTagline] = useState("Where Student Ideas Become Reality");
+  const [siteTitle, setSiteTitle] = useState("EduNova Forge");
+  const [tagline, setTagline] = useState("DISCOVER • BUILD • BRING IDEAS TO LIFE");
   const [upiId, setUpiId] = useState("edunova@paytm");
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [autoApproveProjects, setAutoApproveProjects] = useState(false);
   const [autoApprovePayments, setAutoApprovePayments] = useState(false);
-  const [bannerText, setBannerText] = useState("🚀 EduNova — The #1 Platform for Engineering Students");
+  const [bannerText, setBannerText] = useState("🚀 EduNova Forge — Discover • Build • Bring Ideas to Life");
   const [socials, setSocials] = useState<SocialMediaLinks | null>(null);
 
   const [saved, setSaved] = useState(false);
+  const [isSavingPayment, setIsSavingPayment] = useState(false);
+  const [paymentSaved, setPaymentSaved] = useState(false);
+  const [isSavingSocials, setIsSavingSocials] = useState(false);
+  const [socialsSaved, setSocialsSaved] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [previewQrModal, setPreviewQrModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load existing settings on mount
-  useEffect(() => {
-    const s = getPlatformSettings();
-    setSiteTitle(s.siteTitle);
-    setTagline(s.tagline);
-    setUpiId(s.upiId);
-    setQrCodeUrl(s.qrCodeUrl);
-    setMaintenanceMode(s.maintenanceMode);
-    setAutoApproveProjects(s.autoApproveProjects);
-    setAutoApprovePayments(s.autoApprovePayments);
-    setBannerText(s.bannerText);
+  const hasUserEdited = useRef(false);
 
-    setSocials(getSocialLinks());
+  // Load existing settings on mount & react to live remote updates
+  useEffect(() => {
+    const sync = () => {
+      // Do not clobber fields if admin is actively typing
+      if (hasUserEdited.current) return;
+      const s = getPlatformSettings();
+      setSiteTitle(s.siteTitle);
+      setTagline(s.tagline);
+      setUpiId(s.upiId);
+      setQrCodeUrl(s.qrCodeUrl);
+      setMaintenanceMode(s.maintenanceMode);
+      setAutoApproveProjects(s.autoApproveProjects);
+      setAutoApprovePayments(s.autoApprovePayments);
+      setBannerText(s.bannerText);
+      setSocials(getSocialLinks());
+    };
+
+    sync();
+
+    window.addEventListener("edunova_settings_updated", sync);
+    return () => window.removeEventListener("edunova_settings_updated", sync);
   }, []);
 
-  // Handle uploading custom QR scanner image
+  // Handle uploading custom QR scanner image with automatic compression
   const handleQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -67,11 +83,12 @@ export default function AdminSettingsPage() {
     }
 
     const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setQrCodeUrl(result);
-      setStatusMessage("New QR Code Scanner loaded! Remember to click 'Save All Settings'.");
-      setTimeout(() => setStatusMessage(null), 4000);
+    reader.onload = async () => {
+      const raw = reader.result as string;
+      const compressed = await compressImage(raw, 700, 700, 0.88);
+      setQrCodeUrl(compressed);
+      setStatusMessage("New QR Code Scanner loaded! Click 'Save Payment Configuration' below to apply.");
+      setTimeout(() => setStatusMessage(null), 5000);
     };
     reader.readAsDataURL(file);
   };
@@ -79,11 +96,60 @@ export default function AdminSettingsPage() {
   const handleResetToDynamicQr = () => {
     setQrCodeUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    setStatusMessage("Reverted to automatic dynamic UPI QR generator.");
+    setStatusMessage("Reverted to automatic dynamic UPI QR generator. Remember to click Save.");
     setTimeout(() => setStatusMessage(null), 3000);
   };
 
-  // Save all settings to localStorage + Firestore
+  // Dedicated save handler for Payment Configuration
+  const handleSavePaymentConfig = async () => {
+    setIsSavingPayment(true);
+    try {
+      await savePlatformSettings({
+        upiId,
+        qrCodeUrl,
+        siteTitle,
+        tagline,
+        bannerText,
+        socialLinks: socials || undefined,
+      });
+      setPaymentSaved(true);
+      setStatusMessage("Payment configuration and official UPI QR scanner saved live across the entire website!");
+      setTimeout(() => {
+        setPaymentSaved(false);
+        setStatusMessage(null);
+      }, 3500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error saving payment configuration";
+      alert("Error saving payment configuration: " + msg);
+    } finally {
+      setIsSavingPayment(false);
+    }
+  };
+
+  // Dedicated save handler for Social Media Links
+  const handleSaveSocialsConfig = async () => {
+    if (!socials) return;
+    setIsSavingSocials(true);
+    try {
+      await savePlatformSettings({
+        socialLinks: socials,
+      });
+      saveSocialLinks(socials);
+      setSocialsSaved(true);
+      setStatusMessage("Social media links saved live across the entire website!");
+      setTimeout(() => {
+        setSocialsSaved(false);
+        setStatusMessage(null);
+      }, 3500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error saving social media links";
+      alert("Error saving social media links: " + msg);
+    } finally {
+      setIsSavingSocials(false);
+    }
+  };
+
+  // Save all settings to localStorage + Firestore + Server API
   const handleSave = async () => {
     setIsProcessing(true);
     try {
@@ -96,22 +162,65 @@ export default function AdminSettingsPage() {
         maintenanceMode,
         autoApproveProjects,
         autoApprovePayments,
+        socialLinks: socials || undefined,
       });
 
       if (socials) {
         saveSocialLinks(socials);
       }
 
+      hasUserEdited.current = false;
       setSaved(true);
       setStatusMessage("All platform settings, payment configuration, and QR scanner saved successfully!");
       setTimeout(() => {
         setSaved(false);
         setStatusMessage(null);
       }, 3500);
-    } catch (e: any) {
-      alert("Error saving settings: " + (e?.message || e));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to save settings";
+      alert("Error saving settings: " + msg);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // Immediate toggle persistence handlers
+  const handleToggleMaintenance = async () => {
+    const nextVal = !maintenanceMode;
+    setMaintenanceMode(nextVal);
+    try {
+      await savePlatformSettings({ maintenanceMode: nextVal });
+      setStatusMessage(`Maintenance Mode ${nextVal ? "ENABLED — live across site" : "DISABLED — site is live to all visitors"}`);
+      setTimeout(() => setStatusMessage(null), 3500);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error saving";
+      alert("Failed to update Maintenance Mode: " + msg);
+    }
+  };
+
+  const handleToggleAutoApproveProjects = async () => {
+    const nextVal = !autoApproveProjects;
+    setAutoApproveProjects(nextVal);
+    try {
+      await savePlatformSettings({ autoApproveProjects: nextVal });
+      setStatusMessage(`Auto-Approve Projects ${nextVal ? "ENABLED" : "DISABLED"}`);
+      setTimeout(() => setStatusMessage(null), 3500);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error saving";
+      alert("Failed to update Auto-Approve Projects: " + msg);
+    }
+  };
+
+  const handleToggleAutoApprovePayments = async () => {
+    const nextVal = !autoApprovePayments;
+    setAutoApprovePayments(nextVal);
+    try {
+      await savePlatformSettings({ autoApprovePayments: nextVal });
+      setStatusMessage(`Auto-Approve Payments ${nextVal ? "ENABLED" : "DISABLED"}`);
+      setTimeout(() => setStatusMessage(null), 3500);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error saving";
+      alert("Failed to update Auto-Approve Payments: " + msg);
     }
   };
 
@@ -161,16 +270,27 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleSocialToggle = (key: keyof SocialMediaLinks) => {
+  const handleSocialToggle = async (key: keyof SocialMediaLinks) => {
     if (!socials) return;
-    setSocials({
+    const nextSocials = {
       ...socials,
       [key]: { ...socials[key], enabled: !socials[key].enabled }
-    });
+    };
+    setSocials(nextSocials);
+    try {
+      await savePlatformSettings({ socialLinks: nextSocials });
+      saveSocialLinks(nextSocials);
+      const keyStr = String(key);
+      setStatusMessage(`${keyStr.charAt(0).toUpperCase() + keyStr.slice(1)} ${nextSocials[key].enabled ? "ENABLED" : "DISABLED"} live across platform!`);
+      setTimeout(() => setStatusMessage(null), 3000);
+    } catch (e: unknown) {
+      console.warn("Auto-save social toggle notice:", e);
+    }
   };
 
   const handleSocialUrl = (key: keyof SocialMediaLinks, url: string) => {
     if (!socials) return;
+    hasUserEdited.current = true;
     setSocials({
       ...socials,
       [key]: { ...socials[key], url }
@@ -178,7 +298,7 @@ export default function AdminSettingsPage() {
   };
 
   // Effective QR image for display
-  const activeQrSrc = qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${encodeURIComponent(upiId || "edunova@paytm")}&pn=EduNova%20Technologies&cu=INR`;
+  const activeQrSrc = qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${encodeURIComponent(upiId || "edunova@paytm")}&pn=EduNova%20Forge%20Technologies&cu=INR`;
 
   return (
     <div>
@@ -249,7 +369,10 @@ export default function AdminSettingsPage() {
               <input
                 type="text"
                 value={siteTitle}
-                onChange={e => setSiteTitle(e.target.value)}
+                onChange={e => {
+                  hasUserEdited.current = true;
+                  setSiteTitle(e.target.value);
+                }}
                 className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-cyan-500/30 text-white text-sm focus:outline-none focus:border-cyan-400 focus:bg-[#071d36]/60 transition-colors shadow-inner"
               />
             </div>
@@ -259,7 +382,10 @@ export default function AdminSettingsPage() {
               <input
                 type="text"
                 value={tagline}
-                onChange={e => setTagline(e.target.value)}
+                onChange={e => {
+                  hasUserEdited.current = true;
+                  setTagline(e.target.value);
+                }}
                 className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-cyan-500/30 text-white text-sm focus:outline-none focus:border-cyan-400 focus:bg-[#071d36]/60 transition-colors shadow-inner"
               />
             </div>
@@ -269,7 +395,11 @@ export default function AdminSettingsPage() {
               <textarea
                 rows={2}
                 value={bannerText}
-                onChange={e => setBannerText(e.target.value)}
+                onChange={e => {
+                  hasUserEdited.current = true;
+                  setBannerText(e.target.value);
+                }}
+                placeholder="E.g., 🚀 Welcome to EduNova Forge — Discover • Build • Bring Ideas to Life"
                 className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-cyan-500/30 text-white text-sm focus:outline-none focus:border-cyan-400 focus:bg-[#071d36]/60 transition-colors resize-none shadow-inner"
               />
             </div>
@@ -301,7 +431,10 @@ export default function AdminSettingsPage() {
               <input
                 type="text"
                 value={upiId}
-                onChange={e => setUpiId(e.target.value)}
+                onChange={e => {
+                  hasUserEdited.current = true;
+                  setUpiId(e.target.value);
+                }}
                 placeholder="edunova@paytm"
                 className="w-full px-4 py-2.5 rounded-xl bg-black/40 border border-emerald-500/30 text-white text-sm font-mono focus:outline-none focus:border-emerald-400 focus:bg-[#062417]/60 transition-colors shadow-inner"
               />
@@ -398,6 +531,27 @@ export default function AdminSettingsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Direct Save Button for Payment Configuration */}
+            <div className="pt-1">
+              <button
+                onClick={handleSavePaymentConfig}
+                disabled={isSavingPayment}
+                className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs transition-all shadow-md cursor-pointer ${
+                  paymentSaved
+                    ? "bg-green-500 text-black shadow-green-500/30"
+                    : "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/20 hover:scale-[1.01]"
+                }`}
+              >
+                {isSavingPayment ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Saving Payment Config...</>
+                ) : paymentSaved ? (
+                  <><Check className="w-4 h-4" /> Payment Configuration & Scanner Saved Live!</>
+                ) : (
+                  <><Save className="w-4 h-4" /> Save Payment Configuration</>
+                )}
+              </button>
+            </div>
           </div>
         </motion.div>
 
@@ -426,7 +580,7 @@ export default function AdminSettingsPage() {
                 </p>
                 <p className="text-purple-200/60 text-xs mt-0.5">Temporarily take the site offline for updates</p>
               </div>
-              <button onClick={() => setMaintenanceMode(!maintenanceMode)} className="flex-shrink-0 cursor-pointer">
+              <button onClick={handleToggleMaintenance} className="flex-shrink-0 cursor-pointer" title="Toggle Maintenance Mode">
                 {maintenanceMode ? (
                   <ToggleRight className="w-10 h-10 text-yellow-400" />
                 ) : (
@@ -441,7 +595,7 @@ export default function AdminSettingsPage() {
                 <p className="text-white font-semibold text-sm">Auto-Approve Projects</p>
                 <p className="text-purple-200/60 text-xs mt-0.5">Skip manual review for new project uploads</p>
               </div>
-              <button onClick={() => setAutoApproveProjects(!autoApproveProjects)} className="flex-shrink-0 cursor-pointer">
+              <button onClick={handleToggleAutoApproveProjects} className="flex-shrink-0 cursor-pointer" title="Toggle Auto-Approve Projects">
                 {autoApproveProjects ? (
                   <ToggleRight className="w-10 h-10 text-green-400" />
                 ) : (
@@ -456,7 +610,7 @@ export default function AdminSettingsPage() {
                 <p className="text-white font-semibold text-sm">Auto-Approve Payments</p>
                 <p className="text-purple-200/60 text-xs mt-0.5">Automatically verify uploaded payment screenshots</p>
               </div>
-              <button onClick={() => setAutoApprovePayments(!autoApprovePayments)} className="flex-shrink-0 cursor-pointer">
+              <button onClick={handleToggleAutoApprovePayments} className="flex-shrink-0 cursor-pointer" title="Toggle Auto-Approve Payments">
                 {autoApprovePayments ? (
                   <ToggleRight className="w-10 h-10 text-green-400" />
                 ) : (
@@ -553,6 +707,27 @@ export default function AdminSettingsPage() {
                 />
               </div>
             ))}
+
+            {/* Direct Save Button for Social Media Links */}
+            <div className="pt-2 col-span-full">
+              <button
+                onClick={handleSaveSocialsConfig}
+                disabled={isSavingSocials}
+                className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs transition-all shadow-md cursor-pointer ${
+                  socialsSaved
+                    ? "bg-green-500 text-black shadow-green-500/30"
+                    : "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white shadow-amber-500/20 hover:scale-[1.01]"
+                }`}
+              >
+                {isSavingSocials ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Saving Social Media Links...</>
+                ) : socialsSaved ? (
+                  <><Check className="w-4 h-4" /> Social Media Links Saved Live Across Platform!</>
+                ) : (
+                  <><Save className="w-4 h-4" /> Save Social Media Links Live</>
+                )}
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>

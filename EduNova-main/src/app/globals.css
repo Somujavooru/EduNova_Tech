@@ -34,6 +34,7 @@
 html {
   height: 100%;
   scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
 }
 
 body {
@@ -282,6 +283,37 @@ input[type="month"]::-webkit-calendar-picker-indicator {
 }
 input[type="month"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
+}
+
+/* ── Hardware-Accelerated Micro-Floating Animations (GPU Compositor) ── */
+@keyframes hw-float-1 {
+  0%, 100% { transform: translate3d(0, 0px, 0); }
+  50%      { transform: translate3d(0, -5px, 0); }
+}
+
+@keyframes hw-float-2 {
+  0%, 100% { transform: translate3d(0, 0px, 0); }
+  50%      { transform: translate3d(0, -6px, 0); }
+}
+
+@keyframes hw-float-3 {
+  0%, 100% { transform: translate3d(0, 0px, 0); }
+  50%      { transform: translate3d(0, -5px, 0); }
+}
+
+.animate-hw-float-1 {
+  animation: hw-float-1 5.4s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-hw-float-2 {
+  animation: hw-float-2 6.0s ease-in-out infinite 1.4s;
+  will-change: transform;
+}
+
+.animate-hw-float-3 {
+  animation: hw-float-3 5.6s ease-in-out infinite 2.8s;
+  will-change: transform;
 }
 
 

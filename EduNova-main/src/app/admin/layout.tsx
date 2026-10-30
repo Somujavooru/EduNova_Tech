@@ -5,7 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
+import { EfMonogramLogo } from "@/components/ui/EfMonogramLogo";
+import { NotificationBell } from "@/components/ui/NotificationBell";
+import { EduNovaForgeLogo } from "@/components/ui/EduNovaForgeLogo";
 import {
+  Home,
   LayoutDashboard,
   Users,
   PlusCircle,
@@ -21,13 +25,15 @@ import {
   Star,
   MessageSquare,
   MessagesSquare,
-  ShoppingBag
+  ShoppingBag,
+  ExternalLink
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, onSnapshot, getCountFromServer, getDocs, deleteDoc } from "firebase/firestore";
 import { getContactMessages, fetchContactMessages } from "@/lib/data/contact";
 
 const sidebarLinks = [
+  { href: "/", label: "Home", icon: Home },
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { href: "/admin/users", label: "Users", icon: Users },
@@ -103,14 +109,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         let discussionsCount = 0;
         try {
           const commentsSnap = await getDocs(collection(db, "comments"));
-          const testDocs = commentsSnap.docs.filter((d) => {
-            const txt = (d.data().text || "").trim().toLowerCase();
-            return txt === "shhhh" || txt === "hi" || txt === "hello" || txt === "test" || !txt;
-          });
-          if (testDocs.length > 0) {
-            await Promise.all(testDocs.map((d) => deleteDoc(d.ref))).catch(() => {});
-          }
-          discussionsCount = commentsSnap.docs.length - testDocs.length;
+          const readRaw = typeof window !== "undefined" ? localStorage.getItem("edunova_admin_read_discussions") : null;
+          const readSet = readRaw ? new Set(JSON.parse(readRaw)) : new Set();
+          discussionsCount = commentsSnap.docs.filter((d) => {
+            const data = d.data();
+            const txt = (data.text || "").trim();
+            if (!txt || data.isAdminReply) return false;
+            return !readSet.has(d.id);
+          }).length;
         } catch {}
 
         setBadgeCounts((prev) => ({
@@ -138,21 +144,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     try {
       unsubComments = onSnapshot(
         collection(db, "comments"),
-        async (snap) => {
-          const testDocs = snap.docs.filter((d) => {
-            const txt = (d.data().text || "").trim().toLowerCase();
-            return txt === "shhhh" || txt === "hi" || txt === "hello" || txt === "test" || !txt;
-          });
-          if (testDocs.length > 0) {
-            await Promise.all(testDocs.map((d) => deleteDoc(d.ref))).catch(() => {});
-          }
-          const validRemaining = snap.docs.filter((d) => {
-            const txt = (d.data().text || "").trim().toLowerCase();
-            return txt !== "shhhh" && txt !== "hi" && txt !== "hello" && txt !== "test" && txt;
-          });
+        (snap) => {
+          const readRaw = typeof window !== "undefined" ? localStorage.getItem("edunova_admin_read_discussions") : null;
+          const readSet = readRaw ? new Set(JSON.parse(readRaw)) : new Set();
+          const unreadCount = snap.docs.filter((d) => {
+            const data = d.data();
+            const txt = (data.text || "").trim();
+            if (!txt || data.isAdminReply) return false;
+            return !readSet.has(d.id);
+          }).length;
           setBadgeCounts((prev) => ({
             ...prev,
-            "/admin/discussions": validRemaining.length,
+            "/admin/discussions": unreadCount,
           }));
         },
         () => {}
@@ -295,16 +298,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex min-h-screen relative overflow-hidden bg-gradient-to-br from-[#121026] via-[#0b0918] to-[#06050e]">
-      {/* Admin ambient background lighting */}
-      <div className="fixed top-0 left-64 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[140px] pointer-events-none z-0" />
-      <div className="fixed top-40 right-0 w-[550px] h-[550px] bg-purple-600/20 rounded-full blur-[140px] pointer-events-none z-0" />
-      <div className="fixed bottom-0 left-96 w-[600px] h-[600px] bg-amber-600/15 rounded-full blur-[140px] pointer-events-none z-0" />
-      <div className="fixed bottom-20 right-20 w-[500px] h-[500px] bg-cyan-600/15 rounded-full blur-[140px] pointer-events-none z-0" />
+      {/* Admin ambient background lighting - optimized GPU composite */}
+      <div className="fixed top-0 left-64 w-[380px] h-[380px] bg-indigo-600/10 rounded-full blur-[90px] pointer-events-none z-0" />
+      <div className="fixed top-40 right-0 w-[350px] h-[350px] bg-purple-600/10 rounded-full blur-[90px] pointer-events-none z-0" />
+      <div className="fixed bottom-0 left-96 w-[380px] h-[380px] bg-amber-600/10 rounded-full blur-[90px] pointer-events-none z-0" />
+      <div className="fixed bottom-20 right-20 w-[320px] h-[320px] bg-cyan-600/10 rounded-full blur-[90px] pointer-events-none z-0" />
 
       {/* Sidebar */}
       <aside className="w-64 fixed left-0 top-0 bottom-0 z-40 border-r border-white/10 bg-gradient-to-b from-[#0f0e1d]/98 via-[#090814]/98 to-[#05040b]/98 backdrop-blur-2xl flex flex-col shadow-[4px_0_35px_rgba(0,0,0,0.6)]">
+        {/* Brand Header */}
+        <div className="p-4 pb-3 border-b border-white/10">
+          <Link href="/" className="flex items-center gap-2 group hover:opacity-90 transition-opacity">
+            <EfMonogramLogo size="sm" className="shrink-0" />
+            <EduNovaForgeLogo size="sm" showTagline={false} />
+          </Link>
+        </div>
+
         {/* Owner Badge */}
-        <div className="p-4 border-b border-white/10">
+        <div className="p-3 border-b border-white/10">
           <div className="flex items-center gap-3 p-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-purple-500/10 to-transparent border border-amber-500/30 shadow-inner">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-[0_0_15px_rgba(245,158,11,0.35)]">
               <Crown className="w-5 h-5 text-stone-950 font-bold" />
@@ -326,10 +337,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const Icon = link.icon;
             const count = badgeCounts[link.href] || 0;
             return (
-              <Link key={link.href} href={link.href}>
-                <motion.div
-                  whileHover={{ x: 4 }}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+              <Link key={link.href} href={link.href} prefetch={true}>
+                <div
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 hover:translate-x-1 ${
                     isActive
                       ? "bg-gradient-to-r from-amber-500/20 to-amber-500/5 text-amber-200 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
                       : "text-gray-400 hover:text-white hover:bg-white/[0.05]"
@@ -343,14 +353,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </span>
                   )}
                   {isActive && count === 0 && <ChevronRight className="w-4 h-4 ml-auto text-amber-400" />}
-                </motion.div>
+                </div>
               </Link>
             );
           })}
         </nav>
 
-        {/* Logout */}
-        <div className="p-3 border-t border-white/10">
+        {/* Sidebar Actions */}
+        <div className="p-3 border-t border-white/10 flex flex-col gap-1">
+          <Link
+            href="/marketplace"
+            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-all group"
+          >
+            <ExternalLink className="w-4 h-4 text-gray-500 group-hover:text-cyan-400 transition-colors" />
+            <span>View Marketplace</span>
+          </Link>
           <button
             onClick={logout}
             className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
@@ -362,8 +379,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 relative z-10">
-        <div className="p-6 md:p-8 xl:p-10 max-w-[1400px]">
+      <main className="flex-1 ml-64 relative z-10 flex flex-col min-h-screen">
+        {/* Top Control Bar with Real-time Notification Bell */}
+        <header className="sticky top-0 z-30 border-b border-white/10 bg-[#0f0e1d]/90 backdrop-blur-xl px-6 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-gray-400 font-medium">Platform Command Center</span>
+            <span className="text-gray-600">•</span>
+            <span className="text-amber-400 font-semibold uppercase tracking-wider">
+              {pathname === "/admin" ? "Overview Dashboard" : pathname.replace("/admin/", "").replace(/-/g, " ")}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <NotificationBell userEmail={user.email} userName={user.name} userId={user.id} userRole={user.role} />
+          </div>
+        </header>
+
+        <div className="p-6 md:p-8 xl:p-10 max-w-[1400px] flex-1">
           {children}
         </div>
       </main>

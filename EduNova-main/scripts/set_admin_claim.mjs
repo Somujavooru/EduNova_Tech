@@ -1,11 +1,10 @@
 /**
  * CLI script to grant Firebase Auth custom claims (`admin: true`) and update Firestore role.
  *
- * Usage:
- *   node scripts/set_admin_claim.mjs <email>
+ * Dedicated strictly and exclusively for Vijay: vijayrk0513@gmail.com
  *
- * Example:
- *   node scripts/set_admin_claim.mjs admin@example.com
+ * Usage:
+ *   node scripts/set_admin_claim.mjs vijayrk0513@gmail.com
  */
 
 import { initializeApp, cert, getApps } from "firebase-admin/app";
@@ -19,11 +18,25 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 
-const email = process.argv[2]?.trim().toLowerCase();
+const REQUIRED_TARGET_EMAIL = "vijayrk0513@gmail.com";
+const REQUIRED_TARGET_UID = "V5YRvg0cjla4j1VBP68NzHDOfB23";
 
-if (!email) {
-  console.error("Error: Please provide an email address.");
-  console.error("Usage: node scripts/set_admin_claim.mjs <email>");
+const emailArg = process.argv[2]?.trim().toLowerCase();
+
+// ── Strict Pre-Execution Guard: Reject any email other than vijayrk0513@gmail.com ──
+if (!emailArg) {
+  console.error("Error: Please provide the target email address.");
+  console.error(`Usage: node scripts/set_admin_claim.mjs ${REQUIRED_TARGET_EMAIL}`);
+  process.exit(1);
+}
+
+if (emailArg !== REQUIRED_TARGET_EMAIL) {
+  console.error("\n=======================================================");
+  console.error("SECURITY VIOLATION: INVALID TARGET EMAIL");
+  console.error(`This promotion script is strictly restricted to: ${REQUIRED_TARGET_EMAIL}`);
+  console.error(`Provided email: '${emailArg}' is not permitted.`);
+  console.error("ABORTING IMMEDIATELY. NO FIREBASE CHANGES MADE.");
+  console.error("=======================================================\n");
   process.exit(1);
 }
 
@@ -43,7 +56,6 @@ if (!getApps().length) {
       }),
     });
   } else {
-    // Attempt default application credentials
     app = initializeApp({
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "edunova-ac27f",
     });
@@ -54,26 +66,47 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 async function setAdminClaim() {
-  console.log(`Looking up user for email: ${email}...`);
+  console.log(`Looking up user for email: ${emailArg}...`);
   try {
-    const user = await auth.getUserByEmail(email);
+    const user = await auth.getUserByEmail(emailArg);
     console.log(`Found user: ${user.uid} (${user.email})`);
 
-    // 1. Set Firebase custom claims
-    await auth.setCustomUserClaims(user.uid, { admin: true });
-    console.log(`✓ Custom claim { admin: true } set successfully on Auth user.`);
+    // Strict UID verification guard
+    if (user.uid !== REQUIRED_TARGET_UID) {
+      console.error("\n=======================================================");
+      console.error("SECURITY VIOLATION: UID MISMATCH");
+      console.error(`Expected UID: ${REQUIRED_TARGET_UID}`);
+      console.error(`Resolved UID: ${user.uid}`);
+      console.error("ABORTING IMMEDIATELY. NO FIREBASE CHANGES MADE.");
+      console.error("=======================================================\n");
+      process.exit(1);
+    }
+    console.log(`✓ Safety check passed: Email and UID strictly match Vijay (${REQUIRED_TARGET_UID}).`);
 
-    // 2. Set Firestore role
+    // 1. Preserve existing custom claims and add admin: true without deleting other claims
+    const existingClaims = user.customClaims || {};
+    const updatedClaims = {
+      ...existingClaims,
+      admin: true,
+    };
+    await auth.setCustomUserClaims(user.uid, updatedClaims);
+    console.log(`✓ Custom claims updated safely: ${JSON.stringify(updatedClaims)}`);
+
+    // 2. Update ONLY the required admin fields in Firestore users/{uid} with merge: true
+    const now = new Date().toISOString();
     await db.collection("users").doc(user.uid).set(
       {
+        id: user.uid,
+        email: user.email,
+        name: user.displayName || "Vijay",
         role: "admin",
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       },
       { merge: true }
     );
-    console.log(`✓ Firestore users/${user.uid} document updated with role: "admin".`);
+    console.log(`✓ Firestore users/${user.uid} document updated with role: "admin" (only required admin fields merged).`);
 
-    console.log("\nSuccess! The user is now an administrator.");
+    console.log("\nSuccess! Vijay is now an administrator.");
     console.log("NOTE: If the user is currently logged in, they must refresh their token");
     console.log("(e.g., re-login or call auth.currentUser.getIdToken(true)) to receive the new claim.");
     process.exit(0);

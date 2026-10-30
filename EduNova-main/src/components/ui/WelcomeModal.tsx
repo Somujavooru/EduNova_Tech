@@ -45,7 +45,11 @@ export function WelcomeModal({ userName, onSelectBuy }: Props) {
           <h2 className="text-2xl md:text-3xl font-black text-white mb-2">
             Welcome, {userName}! 🚀
           </h2>
-          <p className="text-gray-400">Discover premium engineering projects curated by EduNova</p>
+          <p className="text-gray-400">
+            Discover premium engineering projects curated by{" "}
+            <span className="font-bold text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.6)]">EduNova</span>{" "}
+            <span className="font-bold text-[#ff7828] drop-shadow-[0_0_8px_rgba(255,120,40,0.6)]">Forge</span>
+          </p>
         </div>
 
         {/* Options */}
@@ -87,7 +91,9 @@ export function WelcomeModal({ userName, onSelectBuy }: Props) {
         </div>
 
         <p className="text-center text-xs text-gray-600">
-          All projects are curated and verified by the EduNova team.
+          All projects are curated and verified by the{" "}
+          <span className="font-semibold text-[#00e5ff]">EduNova</span>{" "}
+          <span className="font-semibold text-[#ff7828]">Forge</span> team.
         </p>
         </motion.div>
       </div>

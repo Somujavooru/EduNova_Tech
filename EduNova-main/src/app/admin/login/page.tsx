@@ -43,7 +43,11 @@ export default function AdminLoginPage() {
             <Shield className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold mb-2 text-glow">Admin Portal</h1>
-          <p className="text-gray-400">Secure access for EduNova management</p>
+          <p className="text-gray-400">
+            Secure access for{" "}
+            <span className="font-semibold text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.6)]">EduNova</span>{" "}
+            <span className="font-semibold text-[#ff7828] drop-shadow-[0_0_8px_rgba(255,120,40,0.6)]">Forge</span> management
+          </p>
         </div>
 
         <Card glowOnHover>

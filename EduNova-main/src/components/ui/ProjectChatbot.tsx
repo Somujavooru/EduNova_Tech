@@ -186,7 +186,7 @@ export function ProjectChatbot({ projects, onSelectProject }: Props) {
     {
       id: "welcome",
       sender: "bot",
-      text: "Hello and welcome to EduNova! 👋✨\n\nI'm your **EduNova AI Assistant**. Ask me anything: find verified engineering projects, check technical architectures, learn about our **25% advance milestone builds**, track orders, or contact our core team!",
+      text: "Hello and welcome to EduNova Forge! 👋✨\n\nI'm your **EduNova Forge AI Assistant**. Ask me anything: find verified engineering projects, check technical architectures, learn about our **25% advance milestone builds**, track orders, or contact our core team!",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     }
   ]);
@@ -259,7 +259,7 @@ function extractOrderIdOrUtr(text: string): string | null {
 
     if (isContactIntent) {
       return {
-        text: "**How to Contact the EduNova Team:** 🤝\n\nWe're here to help you with project inquiries, orders, custom builds, or technical questions!\n\n• ✉️ **Official Support Email**: [edunovasupport@gmail.com](mailto:edunovasupport@gmail.com)\n  *(Direct response from our core engineering team within 24 hours)*\n• 📝 **Direct Contact Form**: Submit a message on our **[Contact Page](/contact)**\n• 🛠️ **Custom Project Requests**: For syllabus or college requirements, submit via **[Custom Projects](/requests)**\n• 🕒 **Support Hours**: Monday – Saturday, 9:00 AM – 8:00 PM IST\n\nIf inquiring about an existing order, please include your **Order ID** or UPI transaction reference for faster resolution!",
+        text: "**How to Contact the EduNova Forge Team:** 🤝\n\nWe're here to help you with project inquiries, orders, custom builds, or technical questions!\n\n• ✉️ **Official Support Email**: [edunovaforgessupport@gmail.com](mailto:edunovaforgessupport@gmail.com)\n  *(Direct response from our core engineering team within 24 hours)*\n• 📝 **Direct Contact Form**: Submit a message on our **[Contact Page](/contact)**\n• 🛠️ **Custom Project Requests**: For syllabus or college requirements, submit via **[Custom Projects](/requests)**\n• 🕒 **Support Hours**: Monday – Saturday, 9:00 AM – 8:00 PM IST\n\nIf inquiring about an existing order, please include your **Order ID** or UPI transaction reference for faster resolution!",
       };
     }
 
@@ -310,7 +310,7 @@ function extractOrderIdOrUtr(text: string): string | null {
         }
 
         return {
-          text: `I searched our records for **${queryId}**, but couldn't locate an active order with that ID yet.\n\n• **Check ID**: Please confirm the exact Order ID (e.g., \`ORD-...\`), Invoice ID, or 12-digit UTR.\n• **Recent Payment**: If you just completed UPI payment, our team verifies UTRs within 15–30 minutes.\n• **Account Orders**: You can view all orders associated with your account on your **[Dashboard](/dashboard)**.\n• **Need Help?**: Email [edunovasupport@gmail.com](mailto:edunovasupport@gmail.com) with your payment screenshot for immediate assistance!`,
+          text: `I searched our records for **${queryId}**, but couldn't locate an active order with that ID yet.\n\n• **Check ID**: Please confirm the exact Order ID (e.g., \`ORD-...\`), Invoice ID, or 12-digit UTR.\n• **Recent Payment**: If you just completed UPI payment, our team verifies UTRs within 15–30 minutes.\n• **Account Orders**: You can view all orders associated with your account on your **[Dashboard](/dashboard)**.\n• **Need Help?**: Email [edunovaforgessupport@gmail.com](mailto:edunovaforgessupport@gmail.com) with your payment screenshot for immediate assistance!`,
         };
       }
 
@@ -328,7 +328,7 @@ function extractOrderIdOrUtr(text: string): string | null {
 
     if (isPaymentSecurityIntent) {
       return {
-        text: "**Payments, Verification & Buyer Protection:** 🛡️\n\n• **Payment Method**: Direct UPI (Google Pay, PhonePe, Paytm, BHIM) via dynamic QR code or UPI ID.\n• **Admin UTR Verification**: Every transaction UTR is manually verified by EduNova administrators.\n• **25% Milestone Advance**: For build-on-order projects, you only pay 25% upfront. You review and verify the working deliverables before paying the final 75% balance.\n• **Buyer Protection & Refunds**: If a build fails to meet the agreed syllabus or technical specifications, our support team steps in immediately for revision or full resolution.",
+        text: "**Payments, Verification & Buyer Protection:** 🛡️\n\n• **Payment Method**: Direct UPI (Google Pay, PhonePe, Paytm, BHIM) via dynamic QR code or UPI ID.\n• **Admin UTR Verification**: Every transaction UTR is manually verified by EduNova Forge administrators.\n• **25% Milestone Advance**: For build-on-order projects, you only pay 25% upfront. You review and verify the working deliverables before paying the final 75% balance.\n• **Buyer Protection & Refunds**: If a build fails to meet the agreed syllabus or technical specifications, our support team steps in immediately for revision or full resolution.",
       };
     }
 
@@ -364,7 +364,7 @@ function extractOrderIdOrUtr(text: string): string | null {
 
     if (isDeliverablesIntent) {
       return {
-        text: "**What You Receive with Every EduNova Project:** 📂\n\n1. **100% Complete Source Code**: Clean, well-commented, unencrypted source code ZIP.\n2. **Step-by-Step Setup Guide**: Clear README with environment setup and execution commands.\n3. **Architecture & Design**: High-level system diagrams, component workflows, and database schemas.\n4. **Project Report & PPT** (where specified): Ready for university evaluations and project seminars.",
+        text: "**What You Receive with Every EduNova Forge Project:** 📂\n\n1. **100% Complete Source Code**: Clean, well-commented, unencrypted source code ZIP.\n2. **Step-by-Step Setup Guide**: Clear README with environment setup and execution commands.\n3. **Architecture & Design**: High-level system diagrams, component workflows, and database schemas.\n4. **Project Report & PPT** (where specified): Ready for university evaluations and project seminars.",
       };
     }
 
@@ -376,20 +376,20 @@ function extractOrderIdOrUtr(text: string): string | null {
 
     if (isSellerIntent) {
       return {
-        text: "**Monetize & Sell Your Engineering Projects on EduNova:** 💡\n\nAre you a student developer or engineer with original projects?\n\n• You can list your verified code and earn royalties on every order.\n• Reach out to our team at [edunovasupport@gmail.com](mailto:edunovasupport@gmail.com) or submit your details via our **[Contact Page](/contact)** with your GitHub repository link and demo video.",
+        text: "**Monetize & Sell Your Engineering Projects on EduNova Forge:** 💡\n\nAre you a student developer or engineer with original projects?\n\n• You can list your verified code and earn royalties on every order.\n• Reach out to our team at [edunovaforgessupport@gmail.com](mailto:edunovaforgessupport@gmail.com) or submit your details via our **[Contact Page](/contact)** with your GitHub repository link and demo video.",
       };
     }
 
     // ─────────────────────────────────────────────────────────────
-    // INTENT 8: About EduNova / Who Created / Capabilities / Help
+    // INTENT 8: About EduNova Forge / Who Created / Capabilities / Help
     // ─────────────────────────────────────────────────────────────
     const isAboutIntent =
-      /\b(who are you|what is edunova|about edunova|about this site|who created|who built|who owns|is this legit|what can you do|help me)\b/i.test(normalized) ||
+      /\b(who are you|what is edunova|what is edunova forge|about edunova|about edunova forge|about this site|who created|who built|who owns|is this legit|what can you do|help me)\b/i.test(normalized) ||
       normalized === "help";
 
     if (isAboutIntent) {
       return {
-        text: "Welcome to EduNova — Where Student Ideas Become Reality! 🎓🚀\n\nI'm your **AI Project Assistant**, here to make finding, ordering, and managing your academic projects effortless.\n\n**Here's how I can help:**\n• **Smart Project Search**: Search 150+ verified projects by language (**Java**, **Python**, **React**, **IoT**, **AI/ML**).\n• **25% Advance Builds**: For build-on-order projects, pay just 25% upfront and track live milestone updates in your dashboard.\n• **Instant Downloads**: Browse projects that include ready-to-run source code ZIPs and setup guides.\n• **Budget Filtering**: Find projects within your price range (e.g. *'under ₹3,000'*).\n• **Support & Contact**: Connect directly with our core engineering team.\n\nWhat would you like to explore today?",
+        text: "Welcome to EduNova Forge — Discover • Build • Bring Ideas to Life! 🎓🚀\n\nI'm your **AI Project Assistant**, here to make finding, ordering, and managing your academic projects effortless.\n\n**Here's how I can help:**\n• **Smart Project Search**: Search 150+ verified projects by language (**Java**, **Python**, **React**, **IoT**, **AI/ML**).\n• **25% Advance Builds**: For build-on-order projects, pay just 25% upfront and track live milestone updates in your dashboard.\n• **Instant Downloads**: Browse projects that include ready-to-run source code ZIPs and setup guides.\n• **Budget Filtering**: Find projects within your price range (e.g. *'under ₹3,000'*).\n• **Support & Contact**: Connect directly with our core engineering team.\n\nWhat would you like to explore today?",
       };
     }
 
@@ -409,7 +409,7 @@ function extractOrderIdOrUtr(text: string): string | null {
 
     if (isAllGreetings || isShortGreeting || /^(good\s*(morning|afternoon|evening|day)|nice\s*to\s*meet\s*you)/i.test(normalized)) {
       return {
-        text: "Hello and welcome to EduNova! 👋✨\n\nI'm your AI Project Assistant. I'm here to help you explore our engineering project catalog, recommend projects for your academic needs, check tech stacks, or guide you through our **25% advance milestone build**.\n\n**How can I help you today?** You can ask me:\n• ☕ *'Show me top Java projects'*\n• 🐍 *'Python desktop GUI with Tkinter'*\n• 💰 *'Projects under ₹3,500'*\n• 🛡️ *'How does the 25% advance build work?'*\n• ⚡ *'What projects are ready for instant download?'*\n• ✉️ *'I want to contact the team'*",
+        text: "Hello and welcome to EduNova Forge! 👋✨\n\nI'm your AI Project Assistant. I'm here to help you explore our engineering project catalog, recommend projects for your academic needs, check tech stacks, or guide you through our **25% advance milestone build**.\n\n**How can I help you today?** You can ask me:\n• ☕ *'Show me top Java projects'*\n• 🐍 *'Python desktop GUI with Tkinter'*\n• 💰 *'Projects under ₹3,500'*\n• 🛡️ *'How does the 25% advance build work?'*\n• ⚡ *'What projects are ready for instant download?'*\n• ✉️ *'I want to contact the team'*",
       };
     }
 
@@ -427,7 +427,7 @@ function extractOrderIdOrUtr(text: string): string | null {
 
     if (normalized.includes("how are you") || normalized.includes("how r u")) {
       return {
-        text: "I'm doing great, thank you for asking! 😊 Ready to help you discover awesome engineering projects, guide you on orders, or answer questions about EduNova. What are you working on?",
+        text: "I'm doing great, thank you for asking! 😊 Ready to help you discover awesome engineering projects, guide you on orders, or answer questions about EduNova Forge. What are you working on?",
       };
     }
 
@@ -451,9 +451,56 @@ function extractOrderIdOrUtr(text: string): string | null {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // INTENT 11: Technical Project Search (STRICT GUARDRAILS)
-    // ONLY search projects if the user explicitly asked for projects
-    // or mentioned recognized technical keywords!
+    // INTENT 11: Direct Project Title / Specific Topic Matching
+    // ─────────────────────────────────────────────────────────────
+    const matchedProject = projects.find(p => {
+      const cleanTitle = p.title.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
+      const titleWords = cleanTitle.split(/\s+/).filter(w => w.length > 2 && !["with", "and", "the", "for", "using", "gui"].includes(w));
+      return titleWords.some(tw => normalized.includes(tw)) || normalized.includes(cleanTitle.trim());
+    });
+
+    if (matchedProject && !isAllGreetings && !isShortGreeting) {
+      const isReady = isProjectReadyToDownload(matchedProject);
+      const advPrice = Math.round(matchedProject.price * 0.25);
+      const paymentInfo = isReady
+        ? `**Price**: ₹${matchedProject.price.toLocaleString("en-IN")} *(Instant Download Ready)*`
+        : `**Total Price**: ₹${matchedProject.price.toLocaleString("en-IN")} • **Pay 25% Advance**: **₹${advPrice.toLocaleString("en-IN")}** to begin development`;
+
+      return {
+        text: `**${matchedProject.title}** 🚀\n\n• ${paymentInfo}\n• **Category**: ${matchedProject.category.toUpperCase()}\n• **Tech Stack**: ${matchedProject.techStack.join(", ")}\n• **Includes**: Full unencrypted source code ZIP, step-by-step setup guide, and documentation!\n\nClick the project card below to view details or place your order:`,
+        matchedProjects: [matchedProject],
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // INTENT 12: Delivery & Timeline Inquiries
+    // ─────────────────────────────────────────────────────────────
+    if (/\b(when will i get|delivery time|how many days|how long|timeline|delivery date|duration|time taken|when deliver)\b/i.test(normalized)) {
+      return {
+        text: "**Project Delivery Timeline:** ⏱️📦\n\n• **Instant Download Projects**: Files are unlocked **immediately** in your Dashboard upon payment approval (typically 10–20 minutes).\n• **Build-on-Order Projects**: Completed and verified within **3 to 7 working days** depending on complexity.\n• **Milestone Progress**: Track live progress (*Planning (25%) → Building (50%) → Testing (75%) → Ready for Delivery*) directly in your **[Dashboard](/dashboard)**!",
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // INTENT 13: Download & Source Code Access
+    // ─────────────────────────────────────────────────────────────
+    if (/\b(how to download|where to download|where are my files|google drive|drive link|source code download|access code|get code)\b/i.test(normalized)) {
+      return {
+        text: "**How to Access Your Project Files:** 📥\n\n1. Log in and go to your **[Dashboard](/dashboard)** under **My Projects**.\n2. Once your order payment is verified by our admin, your project card will show a green **Download Source Files** button.\n3. You also receive a direct Google Drive link containing all source files, setup commands, and project report!",
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // INTENT 14: Referral Rewards & Discounts
+    // ─────────────────────────────────────────────────────────────
+    if (/\b(referral|refer|invite friend|discount code|earn reward|referral code|referrals)\b/i.test(normalized)) {
+      return {
+        text: "**EduNova Forge Student Referral Rewards:** 🎁\n\n• **Auto-Unlock**: Your unique referral code is activated as soon as your first order (including a 25% advance) is approved!\n• **How It Works**: Share your referral link with college friends. When they buy, they get a welcome discount, and **you earn cash rewards** directly credited to your account for future projects!\n• Check your code and tracking on your **[Dashboard](/dashboard)**.",
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // INTENT 15: Technical Project Search (STRICT GUARDRAILS)
     // ─────────────────────────────────────────────────────────────
     const hasSearchVerb = /\b(show|find|search|recommend|list|give me|looking for|best|projects? for|suggest)\b/i.test(normalized);
     const matchedTechTerms = TECHNICAL_KEYWORDS.filter(term => {
@@ -518,11 +565,10 @@ function extractOrderIdOrUtr(text: string): string | null {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // INTENT 12: General Fallback for Unrecognized / Ambiguous Queries
-    // DO NOT dump random projects! Respond politely as an AI assistant.
+    // INTENT 16: Polite Contextual Fallback
     // ─────────────────────────────────────────────────────────────
     return {
-      text: "I'm here to help you with anything on EduNova! 😊\n\nI'm not quite sure if you're looking for a specific engineering project or need assistance with the platform. Here are the most common things I can assist you with:\n\n• 🔍 **Search Projects**: Ask for any domain or tech stack (e.g., *'Show me Python GUI projects'*, *'IoT Arduino'*, *'Java applications'*).\n• 💰 **Budget**: Ask for *'Projects under ₹3,000'*.\n• 🛡️ **25% Advance Build**: Ask *'How does the milestone build work?'*\n• 📦 **Order Tracking**: Ask *'Where is my order?'* to check live build status.\n• ✉️ **Contact Support**: Reach our team directly at [edunovasupport@gmail.com](mailto:edunovasupport@gmail.com) or on our **[Contact Page](/contact)**.\n\nWhat would you like assistance with?",
+      text: "I'm here to help you find the right project or assist with your order! 😊\n\nCould you clarify what you'd like help with? You can ask me:\n• ☕ *'Show me Java or Python projects'*\n• 💰 *'Projects under ₹3,000'*\n• 🛡️ *'How does the 25% advance work?'*\n• 📦 *'Where is my order?'* *(provide Order ID)*\n• 🎓 *'I need a custom university project'*\n• ✉️ *'I want to contact support'*",
     };
   };
 
@@ -611,7 +657,10 @@ function extractOrderIdOrUtr(text: string): string | null {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-white flex items-center gap-1.5">
-                    EduNova AI Assistant
+                    <span>
+                      <span className="text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.7)]">EduNova</span>{" "}
+                      <span className="text-[#ff7828] drop-shadow-[0_0_8px_rgba(255,120,40,0.7)]">Forge</span> AI Assistant
+                    </span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-semibold uppercase">
                       Local
                     </span>

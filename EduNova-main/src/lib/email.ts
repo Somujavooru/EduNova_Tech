@@ -43,7 +43,7 @@ async function sendViaResend(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: options.from || process.env.EMAIL_FROM || "EduNova <onboarding@resend.dev>",
+        from: options.from || process.env.EMAIL_FROM || "EduNova Forge <onboarding@resend.dev>",
         to: [options.to],
         reply_to: options.replyTo,
         subject: options.subject,
@@ -104,7 +104,7 @@ async function dispatchEmail(options: EmailDispatchOptions): Promise<EmailDispat
   if (transporter) {
     try {
       await transporter.sendMail({
-        from: options.from || `"EduNova" <${process.env.SMTP_USER}>`,
+        from: options.from || `"EduNova Forge" <${process.env.SMTP_USER}>`,
         to: options.to,
         replyTo: options.replyTo,
         subject: options.subject,
@@ -222,16 +222,21 @@ const getBaseTemplate = (content: string) => `
 <body>
   <div style="padding: 40px 20px; background-color: #050505;">
     <div class="container">
-      <div class="header">
-        <h1 class="logo">EduNova</h1>
+      <div class="header" style="text-align: center;">
+        <h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <span style="color: #ffffff;">Edu</span><span style="color: #00e5ff;">Nova</span> <span style="color: #ffffff;">Forge</span>
+        </h1>
+        <p style="margin: 6px 0 0; font-size: 8.5px; font-weight: 700; letter-spacing: 2px; color: #94a3b8; text-transform: uppercase; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          DISCOVER <span style="color: #00e5ff;">•</span> BUILD <span style="color: #00e5ff;">•</span> BRING IDEAS TO LIFE
+        </p>
       </div>
       <div class="content">
         ${content}
       </div>
       <div class="footer">
-        <p>This is an automated notification from EduNova.<br>
+        <p>This is an automated notification from EduNova Forge.<br>
         If you need assistance, please contact support@edunova.app</p>
-        <p>&copy; ${new Date().getFullYear()} EduNova Platform. All rights reserved.</p>
+        <p>&copy; ${new Date().getFullYear()} EduNova Forge Platform. All rights reserved.</p>
       </div>
     </div>
   </div>
@@ -244,10 +249,10 @@ export const sendWelcomeEmail = async (email: string, name: string): Promise<Ema
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://edunova.app";
 
   const content = `
-    <h1>Welcome to EduNova 🚀</h1>
+    <h1>Welcome to EduNova Forge 🚀</h1>
     <p>Hi ${safeName},</p>
     <p>Your account has been successfully created. Welcome to the future of educational project collaboration.</p>
-    <p>EduNova is designed to help you build, showcase, and collaborate on cutting-edge projects. You now have full access to our marketplace, requests portal, and collaboration tools.</p>
+    <p>EduNova Forge is designed to help you build, showcase, and collaborate on cutting-edge projects. You now have full access to our marketplace, requests portal, and collaboration tools.</p>
     
     <div style="text-align: center; margin: 30px 0;">
       <a href="${appUrl}/dashboard" class="btn">Access Dashboard</a>
@@ -265,9 +270,9 @@ export const sendWelcomeEmail = async (email: string, name: string): Promise<Ema
 
   return await dispatchEmail({
     to: email,
-    subject: "Welcome to EduNova 🚀",
+    subject: "Welcome to EduNova Forge 🚀",
     html: getBaseTemplate(content),
-    from: `"EduNova Team" <${process.env.SMTP_USER || "noreply@edunova.app"}>`,
+    from: `"EduNova Forge Team" <${process.env.SMTP_USER || "noreply@edunova.app"}>`,
   });
 };
 
@@ -286,7 +291,7 @@ export const sendLoginAlertEmail = async (
   const content = `
     <h1>New Login Detected</h1>
     <p>Hi ${safeName},</p>
-    <p>We detected a successful login to your EduNova account (<span style="color:#b026ff">${escapeHtml(email)}</span>).</p>
+    <p>We detected a successful login to your EduNova Forge account (<span style="color:#b026ff">${escapeHtml(email)}</span>).</p>
     
     <div class="card">
       <div class="data-row">
@@ -314,9 +319,9 @@ export const sendLoginAlertEmail = async (
 
   return await dispatchEmail({
     to: email,
-    subject: "New Login Detected on Your EduNova Account",
+    subject: "New Login Detected on Your EduNova Forge Account",
     html: getBaseTemplate(content),
-    from: `"EduNova Security" <${process.env.SMTP_USER || "security@edunova.app"}>`,
+    from: `"EduNova Forge Security" <${process.env.SMTP_USER || "security@edunova.app"}>`,
   });
 };
 
@@ -328,7 +333,7 @@ export const sendContactNotificationEmail = async (data: {
   phone?: string;
   projectRef?: string;
 }): Promise<EmailDispatchResult> => {
-  const supportEmail = "edunovasupport@gmail.com";
+  const supportEmail = "edunovaforgessupport@gmail.com";
   const time = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
 
   const safeName = escapeHtml(data.name);
@@ -340,7 +345,7 @@ export const sendContactNotificationEmail = async (data: {
 
   const content = `
     <h1>New Support Inquiry 📬</h1>
-    <p>A new message has been submitted from the <strong>EduNova Contact Form</strong>.</p>
+    <p>A new message has been submitted from the <strong>EduNova Forge Contact Form</strong>.</p>
     
     <div class="card">
       <div class="data-row">
@@ -384,8 +389,8 @@ export const sendContactNotificationEmail = async (data: {
   return await dispatchEmail({
     to: supportEmail,
     replyTo: data.email,
-    subject: `[EduNova Support] ${data.subject} - ${data.name}`,
+    subject: `[EduNova Forge Support] ${data.subject} - ${data.name}`,
     html: getBaseTemplate(content),
-    from: `"EduNova Support Inquiry" <${process.env.SMTP_USER || "edunovasupport@gmail.com"}>`,
+    from: `"EduNova Forge Support Inquiry" <${process.env.SMTP_USER || "edunovaforgessupport@gmail.com"}>`,
   });
 };

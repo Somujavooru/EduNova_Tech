@@ -1,53 +1,61 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { ArrowRight, PenLine, Star, ChevronRight } from "lucide-react";
+import {
+  ArrowRight,
+  GraduationCap,
+  ShoppingCart,
+  Cog,
+  CheckCircle2,
+  Star,
+  ChevronRight,
+} from "lucide-react";
 import { Project, getPublicProjects, mockProjects } from "@/lib/data/mockProjects";
 import { categories } from "@/lib/data/categories";
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { HomeBackground } from "@/components/backgrounds/HomeBackground";
 import { Hero3DCoverflow } from "@/components/ui/Hero3DCoverflow";
 
-// ─── Real data, computed once at module level from the static mock layer ────
-// These numbers come directly from mockProjects.ts — nothing is invented.
-
 const APPROVED = mockProjects.filter(p => p.status === "approved");
-const TOTAL_PROJECTS = APPROVED.length;                               // 8
-const TOTAL_CATEGORIES = categories.length;                           // 9
-const MIN_PRICE = Math.min(...APPROVED.map(p => p.price));           // 899
+const TOTAL_PROJECTS = APPROVED.length;
+const TOTAL_CATEGORIES = categories.length;
 const AVG_RATING = (
-  APPROVED.reduce((s, p) => s + p.rating, 0) / APPROVED.length
-).toFixed(1);                                                         // 4.7
+  APPROVED.reduce((s, p) => s + p.rating, 0) / (APPROVED.length || 1)
+).toFixed(1);
 
-// Project counts per category — used by the category hierarchy grid
 const COUNT_BY_CATEGORY: Record<string, number> = {};
 for (const p of APPROVED) {
   COUNT_BY_CATEGORY[p.category] = (COUNT_BY_CATEGORY[p.category] ?? 0) + 1;
 }
 
-// The "banner" project is the hero card — defined in mock data, not invented
-const HERO_PROJECT = APPROVED.find(p => p.featured === "banner") ?? APPROVED[0];
+const INITIAL_FEATURED: Project[] = (() => {
+  const preferred = [
+    APPROVED.find(p => p.id === "proj-predictive-maintenance"),
+    APPROVED.find(p => p.id === "proj-solar-agri-robot"),
+    APPROVED.find(p => p.id === "proj-ai-skill-agent"),
+    APPROVED.find(p => p.id === "proj-gas-leakage"),
+  ].filter((p): p is Project => Boolean(p));
 
-const INITIAL_FEATURED: Project[] = [
-  APPROVED.find(p => p.id === "proj-predictive-maintenance"),
-  APPROVED.find(p => p.id === "proj-solar-agri-robot"),
-  APPROVED.find(p => p.id === "proj-ai-skill-agent"),
-].filter((p): p is Project => Boolean(p));
+  if (preferred.length >= 3) return preferred.slice(0, 3);
+  const remaining = APPROVED.filter(p => !preferred.some(pr => pr.id === p.id));
+  return [...preferred, ...remaining].slice(0, 3);
+})();
 
 export default function Home() {
   const router = useRouter();
+  const [projectsList, setProjectsList] = useState<Project[]>(APPROVED);
   const [featuredProjects, setFeaturedProjects] = useState<Project[]>(INITIAL_FEATURED);
 
   useEffect(() => {
-    // Pull from Firestore (with local fallback via mockProjects)
     getPublicProjects().then(all => {
       const approved = all.filter(p => p.status === "approved");
+      if (approved.length > 0) {
+        setProjectsList(approved);
+      }
 
-      // Curate flagship high-complexity engineering projects (Spring Boot, IoT Robotics, AI Agents)
       const flagshipIds = [
         "proj-predictive-maintenance",
         "proj-solar-agri-robot",
@@ -55,14 +63,13 @@ export default function Home() {
         "proj-esp32-cam-display",
         "proj-hospital-appointment",
         "proj-gas-leakage",
-        "p3", // MERN Stack E-Commerce Platform
+        "p3",
       ];
 
       const flagshipProjects = flagshipIds
         .map(id => approved.find(p => p.id === id))
         .filter((p): p is Project => Boolean(p));
 
-      // Fill remaining if needed with complex projects (filtering out basic drawings or scripts)
       const otherComplex = approved
         .filter(p => !flagshipIds.includes(p.id))
         .filter(p => {
@@ -72,94 +79,357 @@ export default function Home() {
         .sort((a, b) => b.price - a.price);
 
       const combined = [...flagshipProjects, ...otherComplex];
-      setFeaturedProjects(combined.slice(0, 3));
+      if (combined.length > 0) {
+        setFeaturedProjects(combined.slice(0, 3));
+      }
     });
   }, []);
 
-  const handleCategoryClick = (categoryId: string) =>
+  const handleCategoryClick = (categoryId: string) => {
     router.push(`/marketplace?category=${categoryId}`);
+  };
 
   return (
     <div className="relative flex flex-col min-h-screen">
       {/* ── Living Engineering Blueprint Cosmos & Solar Plasma Background ── */}
       <HomeBackground />
 
-      {/* ── Hero — two columns: copy left, real project card right ────── */}
-      <section className="relative flex flex-col justify-center">
-        <div className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-12 pt-20 pb-8 md:pt-24 md:pb-12">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-14 items-center">
+      {/* ── Main Viewport Container (Fold 1) — Proportional flexbox ensuring full view of Hero + Service Cards at 1920x1080 ── */}
+      <div className="relative z-10 w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-12 flex flex-col justify-start lg:justify-center min-h-[calc(100vh-56px)] gap-2 sm:gap-3 xl:gap-4 py-2 xl:py-3">
+        
+        {/* ── Hero Section (Two columns: brand message left, 3D carousel right) ── */}
+        <section className="relative w-full pt-0.5 pb-1 flex-shrink-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-8 xl:gap-10 items-center">
 
-            {/* Left — copy */}
-            <div className="max-w-xl">
-              <motion.h1
-                initial={{ opacity: 0, y: 12 }}
+            {/* Left Column — Brand & Mission Copy */}
+            <div className="max-w-xl xl:max-w-2xl">
+              {/* Category Indicator Pill */}
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className="text-4xl md:text-5xl xl:text-6xl font-bold leading-[1.1] tracking-tight text-stone-100 mb-5"
+                transition={{ duration: 0.35 }}
+                className="inline-flex items-center gap-2 sm:gap-2.5 px-3 py-1 rounded-full bg-[#0d1527]/90 border border-cyan-500/30 shadow-[0_0_12px_rgba(0,229,255,0.2)] mb-2 xl:mb-2.5 backdrop-blur-md"
               >
-                Your project deadline is{" "}
-                <span className="text-amber-500">not the time to start from scratch.</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#00e5ff]" />
+                <span className="text-[10.5px] sm:text-[11px] font-bold tracking-wider text-cyan-300 uppercase">STUDENTS</span>
+                <span className="text-stone-600 select-none">•</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_#ff7828]" />
+                <span className="text-[10.5px] sm:text-[11px] font-bold tracking-wider text-amber-300 uppercase">BUSINESSES</span>
+                <span className="text-stone-600 select-none">•</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shadow-[0_0_6px_#c084fc]" />
+                <span className="text-[10.5px] sm:text-[11px] font-bold tracking-wider text-purple-300 uppercase">AUTOMATION</span>
+              </motion.div>
+
+              {/* Main Headline */}
+              <motion.h1
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                className="text-3xl sm:text-4xl lg:text-[44px] xl:text-[48px] font-black leading-[1.08] tracking-tight text-white mb-2.5 xl:mb-3"
+              >
+                Ideas Into{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff7828] via-[#f59e0b] to-[#fbbf24] drop-shadow-[0_0_25px_rgba(255,120,40,0.4)]">
+                  Reality.
+                </span>
               </motion.h1>
 
+              {/* Supporting Description */}
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.45, delay: 0.3 }}
-                className="text-stone-400 text-base md:text-lg leading-relaxed mb-3"
+                transition={{ duration: 0.4, delay: 0.15 }}
+                className="text-stone-300 text-sm sm:text-[15px] xl:text-[15.5px] leading-relaxed mb-3 xl:mb-4 font-normal max-w-xl"
               >
-                EduNova has ready-to-submit engineering projects — IoT,
-                ML, web, mobile, hardware — built for actual college requirements.
+                Engineering projects, e-commerce platforms, and smart automation solutions — built to help students and businesses turn ideas into real-world solutions.
               </motion.p>
 
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.45, delay: 0.4 }}
-                className="text-stone-500 text-sm leading-relaxed mb-6"
-              >
-                Need something that doesn&apos;t exist yet? Describe it and we&apos;ll scope and
-                build it for you.
-              </motion.p>
-
+              {/* Three subtle visual indicators for categories */}
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.5 }}
-                className="flex flex-col sm:flex-row items-start gap-3"
+                transition={{ duration: 0.4, delay: 0.25 }}
+                className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3.5 xl:mb-4"
               >
-                <Link href="/marketplace">
-                  <Button size="lg" as="div">
-                    Browse Projects <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </Link>
-                <Link href="/requests">
-                  <Button size="lg" variant="secondary" as="div">
-                    <PenLine className="w-4 h-4" />
-                    Request a custom build
-                  </Button>
-                </Link>
+                {/* For Students */}
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 xl:w-10 xl:h-10 rounded-full bg-cyan-950/80 border border-cyan-400/60 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(0,229,255,0.3)]">
+                    <GraduationCap className="w-4.5 h-4.5 text-cyan-300" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-cyan-300 leading-tight">For Students</p>
+                    <p className="text-[10.5px] xl:text-[11px] text-stone-400 leading-tight mt-0.5">Explore, learn and build projects</p>
+                  </div>
+                </div>
+
+                {/* For Businesses */}
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 xl:w-10 xl:h-10 rounded-full bg-amber-950/80 border border-amber-400/60 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(255,120,40,0.3)]">
+                    <ShoppingCart className="w-4.5 h-4.5 text-amber-300" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-amber-300 leading-tight">For Businesses</p>
+                    <p className="text-[10.5px] xl:text-[11px] text-stone-400 leading-tight mt-0.5">Launch online store and grow digitally</p>
+                  </div>
+                </div>
+
+                {/* For Everyone */}
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 xl:w-10 xl:h-10 rounded-full bg-purple-950/80 border border-purple-400/60 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(192,132,252,0.3)]">
+                    <Cog className="w-4.5 h-4.5 text-purple-300" />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-purple-300 leading-tight">For Everyone</p>
+                    <p className="text-[10.5px] xl:text-[11px] text-stone-400 leading-tight mt-0.5">Automate work and save time</p>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Action Buttons */}
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: 0.3 }}
+                className="flex flex-wrap items-center gap-3"
+              >
+                <a
+                  href="#services"
+                  className="inline-flex items-center justify-center gap-2 px-5.5 py-2.5 sm:px-6 sm:py-3 rounded-xl font-bold text-xs sm:text-sm text-stone-950 bg-gradient-to-r from-[#ff7828] to-[#f59e0b] hover:from-[#ff8838] hover:to-[#fbbf24] shadow-[0_0_20px_rgba(255,120,40,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Explore Our Services <ArrowRight className="w-4 h-4" />
+                </a>
               </motion.div>
             </div>
 
-            {/* Right — 3D Perspective Coverflow Poster Carousel */}
-            {APPROVED.length > 0 && (
+            {/* Right Column — 3D Perspective Coverflow Carousel */}
+            {projectsList.length > 0 && (
               <motion.div
-                initial={{ opacity: 0, y: 16 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="w-full mt-8 lg:mt-0"
+                transition={{ duration: 0.5, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                className="w-full mt-1 lg:mt-0"
               >
-                <Hero3DCoverflow projects={APPROVED} />
+                <Hero3DCoverflow projects={projectsList} />
               </motion.div>
             )}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── Stats band — real numbers only, nothing invented ────────────── */}
-      <section className="border-y border-white/[0.05] py-7">
+        {/* ── Three Service Cards Directly Below the Hero (Reference Image 2) ── */}
+        <section id="services" className="relative z-10 mt-1 sm:mt-1.5 xl:mt-2 pt-0 pb-1 xl:pb-2 scroll-mt-16 flex-shrink-0">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 xl:gap-4 items-stretch">
+
+            {/* ── Card 1: Engineering Projects ── */}
+            <div
+              className="animate-hw-float-1 group relative rounded-xl bg-gradient-to-b from-[#0e1628]/95 via-[#090d1a]/95 to-[#05070e]/98 border-2 border-cyan-400/50 p-2.5 sm:p-3 xl:p-3.5 flex flex-col justify-between shadow-[0_0_20px_rgba(0,229,255,0.18)] hover:shadow-[0_0_35px_rgba(0,229,255,0.3)] hover:border-cyan-400 hover:-translate-y-1.5 transition-all duration-300"
+            >
+              <div>
+                {/* Header */}
+                <div className="flex items-start gap-2.5 mb-1.5 xl:mb-2">
+                  <div className="w-7.5 h-7.5 xl:w-8 xl:h-8 rounded-full bg-cyan-950/80 border-2 border-cyan-400 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(0,229,255,0.4)] text-cyan-300">
+                    <GraduationCap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm sm:text-base xl:text-[17px] font-black text-[#00e5ff] tracking-tight leading-tight">
+                      Engineering Projects
+                    </h2>
+                    <p className="text-[10px] xl:text-[10.5px] text-stone-300 leading-tight mt-0.5 line-clamp-2">
+                      Mini-projects, final year projects and project resources for engineering students.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Features & Visual Thumbnail */}
+                <div className="grid grid-cols-12 gap-2.5 items-center mb-1.5 xl:mb-2">
+                  <div className="col-span-7 flex flex-col gap-0.5 xl:gap-1">
+                    {[
+                      "Ready-made project resources",
+                      "Custom project development",
+                      "Documentation and guidance",
+                      "Projects in IoT, AI, ML, Web, Embedded & more",
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-start gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-cyan-400 shrink-0 mt-0.5" />
+                        <span className="text-[9.5px] xl:text-[10.5px] text-stone-200 leading-tight font-medium">
+                          {item}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="col-span-5">
+                    <div className="relative aspect-[4/3] rounded-md overflow-hidden border border-cyan-500/30 shadow-sm group-hover:border-cyan-400/60 transition-colors w-full max-w-[105px] xl:max-w-[120px] mx-auto">
+                      <img
+                        src="/services/engineering-projects.jpg"
+                        alt="Engineering Projects robotics kit and code"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Row */}
+              <div className="pt-1.5 xl:pt-2 border-t border-cyan-500/20 flex items-end justify-between gap-2">
+                <div>
+                  <span className="text-[7.5px] xl:text-[8px] uppercase tracking-wider text-stone-400 font-semibold block leading-none">
+                    Starting at
+                  </span>
+                  <span className="text-lg xl:text-xl font-black text-[#00e5ff] tracking-tight leading-none mt-0.5 block">
+                    @499
+                  </span>
+                </div>
+                <Link href="/marketplace">
+                  <button className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg font-bold text-[10px] xl:text-[11px] text-stone-950 bg-[#00e5ff] hover:bg-[#38eeff] shadow-[0_0_12px_rgba(0,229,255,0.4)] transition-all active:scale-[0.98] cursor-pointer">
+                    Explore Projects <ArrowRight className="w-3 h-3" />
+                  </button>
+                </Link>
+              </div>
+            </div>
+
+            {/* ── Card 2: E-Commerce Services ── */}
+            <div
+              className="animate-hw-float-2 group relative rounded-xl bg-gradient-to-b from-[#14121d]/95 via-[#0d0f19]/95 to-[#05060d]/98 border-2 border-amber-400/50 p-2.5 sm:p-3 xl:p-3.5 flex flex-col justify-between shadow-[0_0_22px_rgba(245,158,11,0.2)] hover:shadow-[0_0_38px_rgba(245,158,11,0.36)] hover:border-amber-400 hover:-translate-y-1.5 transition-all duration-300"
+            >
+              <div>
+                {/* Header */}
+                <div className="flex items-start gap-2.5 mb-1.5 xl:mb-2">
+                  <div className="w-7.5 h-7.5 xl:w-8 xl:h-8 rounded-full bg-amber-500/15 border-2 border-amber-400 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(245,158,11,0.4)] text-amber-300">
+                    <ShoppingCart className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm sm:text-base xl:text-[17px] font-black text-[#fbbf24] tracking-tight leading-tight">
+                      E-Commerce Services
+                    </h2>
+                    <p className="text-[10px] xl:text-[10.5px] text-stone-300 leading-tight mt-0.5 line-clamp-2">
+                      Launch your online store with modern shopping experiences and smart integration.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Features & Visual Thumbnail */}
+                <div className="grid grid-cols-12 gap-2.5 items-center mb-1.5 xl:mb-2">
+                  <div className="col-span-7 flex flex-col gap-0.5 xl:gap-1">
+                    {[
+                      "E-commerce website development",
+                      "Product catalog and payment integration",
+                      "Shopping cart and order management",
+                      "Custom e-commerce solutions",
+                      "Maintenance and support",
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-start gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                        <span className="text-[9.5px] xl:text-[10.5px] text-stone-200 leading-tight font-medium">
+                          {item}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="col-span-5">
+                    <div className="relative aspect-[4/3] rounded-md overflow-hidden border border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.15)] group-hover:border-amber-400/60 transition-colors w-full max-w-[105px] xl:max-w-[120px] mx-auto">
+                      <img
+                        src="/services/ecommerce-services.jpg"
+                        alt="E-Commerce store laptop and phone mockup"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Row */}
+              <div className="pt-1.5 xl:pt-2 border-t border-amber-500/20 flex items-end justify-between gap-2">
+                <div>
+                  <span className="text-[7.5px] xl:text-[8px] uppercase tracking-wider text-stone-400 font-semibold block leading-none">
+                    Starting at
+                  </span>
+                  <span className="text-lg xl:text-xl font-black text-[#fbbf24] tracking-tight leading-none mt-0.5 block">
+                    @999
+                  </span>
+                </div>
+                <Link href="/requests?service=ecommerce">
+                  <button className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg font-bold text-[10px] xl:text-[11px] text-stone-950 bg-gradient-to-r from-[#f59e0b] via-[#fbbf24] to-[#f59e0b] hover:from-[#fbbf24] hover:to-[#f59e0b] shadow-[0_0_14px_rgba(245,158,11,0.45)] transition-all active:scale-[0.98] cursor-pointer">
+                    Explore E-Commerce Services <ArrowRight className="w-3 h-3" />
+                  </button>
+                </Link>
+              </div>
+            </div>
+
+            {/* ── Card 3: Automation Solutions ── */}
+            <div
+              className="animate-hw-float-3 group relative rounded-xl bg-gradient-to-b from-[#161126]/95 via-[#0e0c1c]/95 to-[#06050e]/98 border-2 border-purple-400/50 p-2.5 sm:p-3 xl:p-3.5 flex flex-col justify-between shadow-[0_0_22px_rgba(168,85,247,0.2)] hover:shadow-[0_0_38px_rgba(168,85,247,0.36)] hover:border-purple-400 hover:-translate-y-1.5 transition-all duration-300"
+            >
+              <div>
+                {/* Header */}
+                <div className="flex items-start gap-2.5 mb-1.5 xl:mb-2">
+                  <div className="w-7.5 h-7.5 xl:w-8 xl:h-8 rounded-full bg-purple-500/15 border-2 border-[#c084fc] flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(168,85,247,0.4)] text-[#c084fc]">
+                    <Cog className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm sm:text-base xl:text-[17px] font-black text-[#c084fc] tracking-tight leading-tight">
+                      Automation Solutions
+                    </h2>
+                    <p className="text-[10px] xl:text-[10.5px] text-stone-300 leading-tight mt-0.5 line-clamp-2">
+                      Smart automation systems to reduce manual work and save time.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Features & Visual Thumbnail */}
+                <div className="grid grid-cols-12 gap-2.5 items-center mb-1.5 xl:mb-2">
+                  <div className="col-span-7 flex flex-col gap-0.5 xl:gap-1">
+                    {[
+                      "Social media auto-posting",
+                      "Order and enquiry automation",
+                      "Workflow and notification systems",
+                      "Data management and reporting",
+                      "Custom automation solutions",
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-start gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-purple-400 shrink-0 mt-0.5" />
+                        <span className="text-[9.5px] xl:text-[10.5px] text-stone-200 leading-tight font-medium">
+                          {item}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="col-span-5">
+                    <div className="relative aspect-[4/3] rounded-md overflow-hidden border border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.15)] group-hover:border-purple-400/60 transition-colors w-full max-w-[105px] xl:max-w-[120px] mx-auto">
+                      <img
+                        src="/services/automation-solutions.jpg"
+                        alt="Workflow automation dashboard and social publishing"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Row */}
+              <div className="pt-1.5 xl:pt-2 border-t border-purple-500/20 flex items-end justify-between gap-2">
+                <div>
+                  <span className="text-[7.5px] xl:text-[8px] uppercase tracking-wider text-stone-400 font-semibold block leading-none">
+                    Starting at
+                  </span>
+                  <span className="text-lg xl:text-xl font-black text-[#c084fc] tracking-tight leading-none mt-0.5 block">
+                    @999
+                  </span>
+                </div>
+                <Link href="/requests?service=automation">
+                  <button className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg font-bold text-[10px] xl:text-[11px] text-stone-950 bg-gradient-to-r from-[#c084fc] via-[#d8b4fe] to-[#c084fc] hover:from-[#d8b4fe] hover:to-[#c084fc] shadow-[0_0_14px_rgba(168,85,247,0.45)] transition-all active:scale-[0.98] cursor-pointer">
+                    Explore Automation Solutions <ArrowRight className="w-3 h-3" />
+                  </button>
+                </Link>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+
+      {/* ── Stats band — real verified numbers ── */}
+      <section className="relative z-10 border-y border-white/[0.08] py-8 bg-black/40 backdrop-blur-md">
         <div className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-12">
-          <div className="flex flex-wrap gap-x-12 gap-y-5 items-center">
+          <div className="flex flex-wrap gap-x-12 gap-y-5 items-center justify-between">
             <StatItem value="100%" label="verified source code & documentation" />
             <StatItem value={`${TOTAL_CATEGORIES}`} label="engineering categories" />
             <StatItem value="Instant" label="commercial license & download" />
@@ -168,7 +438,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Category section — hierarchy grid with real project counts ──── */}
+      {/* ── Category section — hierarchy grid with real project counts ── */}
       <section className="pt-16 pb-14 relative z-10">
         <div className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-12">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
@@ -196,10 +466,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Trending inventory — real project cards, not marketing copy ─── */}
+      {/* ── Trending inventory — real project cards ── */}
       <section className="pt-4 pb-20 relative z-10">
         <div className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-12">
-
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
             <div>
               <p className="text-xs uppercase tracking-widest text-amber-400 mb-2 font-bold flex items-center gap-2">
@@ -220,42 +489,25 @@ export default function Home() {
 
           {featuredProjects.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6">
-
               {/* Card 0 — larger: spans 2 cols */}
-              <motion.div
-                className="md:col-span-2"
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: 0 }}
-              >
+              <div className="md:col-span-2">
                 <ProjectCard project={featuredProjects[0]} imageHeight="h-64" />
-              </motion.div>
+              </div>
 
-              {/* Card 1 — standard */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
-              >
+              {/* Card 1 */}
+              <div>
                 <ProjectCard project={featuredProjects[1]} imageHeight="h-48" />
-              </motion.div>
+              </div>
 
-              {/* Card 2 — standard */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: 0.14 }}
-              >
+              {/* Card 2 */}
+              <div>
                 <ProjectCard project={featuredProjects[2]} imageHeight="h-48" />
-              </motion.div>
+              </div>
 
               <div className="md:col-span-3 flex justify-end mt-2">
                 <Link
                   href="/marketplace"
-                  className="text-sm text-stone-500 hover:text-amber-400 transition-colors border-b border-transparent hover:border-amber-400/40 pb-0.5"
+                  className="text-sm text-stone-400 hover:text-amber-400 transition-colors border-b border-transparent hover:border-amber-400/40 pb-0.5"
                 >
                   See all projects in the marketplace →
                 </Link>
@@ -265,19 +517,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Custom Build — distinct section, not another card ───────────── */}
-      <section className="py-16 border-t border-white/[0.05]">
+      {/* ── Custom Build — distinct section ── */}
+      <section className="py-16 border-t border-white/[0.05] relative z-10 bg-black/20">
         <div className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-start">
-
-            {/* Left — what it is */}
+            {/* Left */}
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-stone-600 mb-3 font-semibold">
+              <p className="text-[10px] uppercase tracking-widest text-cyan-400 mb-3 font-semibold">
                 Custom Projects
               </p>
               <h2 className="text-2xl md:text-3xl font-bold text-stone-100 mb-4 leading-snug">
                 Don&apos;t see exactly what you need?<br />
-                <span className="text-amber-500">We build to order.</span>
+                <span className="text-[#ff7828]">We build to order.</span>
               </h2>
               <p className="text-stone-400 text-sm leading-relaxed mb-6 max-w-md">
                 Describe your project requirements — topic, tech stack,
@@ -285,13 +536,13 @@ export default function Home() {
                 working project tailored to your brief. No generic templates.
               </p>
               <Link href="/requests">
-                <Button variant="secondary" as="div">
+                <Button variant="secondary">
                   Submit a custom request <ChevronRight className="w-4 h-4" />
                 </Button>
               </Link>
             </div>
 
-            {/* Right — how it works (plain list, not a grid of identical cards) */}
+            {/* Right */}
             <div className="flex flex-col gap-5">
               {[
                 {
@@ -325,250 +576,22 @@ export default function Home() {
         </div>
       </section>
 
+
     </div>
   );
 }
 
-// ─── Hero project carousel — auto-transitions across categories ──────────
-function HeroCarousel({ projects }: { projects: Project[] }) {
-  // Curate order with flagship high-complexity engineering projects
-  const orderedProjects = [
-    projects.find(p => p.id === "proj-predictive-maintenance") || projects.find(p => p.id === "p6" || p.category === "web"),
-    projects.find(p => p.id === "proj-solar-agri-robot") || projects.find(p => p.id === "p1" || p.category === "iot" || p.category === "hardware"),
-    projects.find(p => p.id === "proj-ai-skill-agent") || projects.find(p => p.id === "p2" || p.category === "aiml"),
-    projects.find(p => p.id === "proj-esp32-cam-display") || projects.find(p => p.id === "p7" || p.category === "embedded"),
-    projects.find(p => p.id === "proj-hospital-appointment") || projects.find(p => p.id === "p3" || p.category === "web"),
-    projects.find(p => p.id === "proj-gas-leakage") || projects.find(p => p.category === "hardware"),
-  ].filter((p): p is Project => Boolean(p));
-
-  const items = orderedProjects.length > 0 ? orderedProjects : projects;
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-
-  useEffect(() => {
-    if (isPaused || items.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % items.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [isPaused, items.length]);
-
-  const currentProject = items[currentIndex];
-  if (!currentProject) return null;
-
-  const categoryLabels: Record<string, string> = {
-    web: "Web App",
-    mobile: "Mobile App",
-    iot: "IoT & Embedded",
-    hardware: "Hardware & Embedded",
-    aiml: "AI & Machine Learning",
-    cybersecurity: "Cybersecurity & Networks",
-    cloud: "Cloud & DevOps",
-    blockchain: "Blockchain & Web3",
-  };
-
-  return (
-    <div
-      className="relative w-full max-w-lg mx-auto"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-    >
-      {/* Decorative ambient gradient backdrop */}
-      <div className="absolute -inset-1.5 bg-gradient-to-tr from-amber-500/20 via-orange-500/10 to-amber-500/20 rounded-2xl blur-xl opacity-75 -z-10" />
-
-      {/* Top indicator & slide progress */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-          </span>
-          <span className="text-[11px] font-semibold text-stone-300 uppercase tracking-wider">
-            {categoryLabels[currentProject.category] || currentProject.category}
-          </span>
-          <span className="text-[10px] text-stone-600">
-            • {currentIndex + 1} of {items.length}
-          </span>
-        </div>
-
-        {/* Step dots */}
-        <div className="flex items-center gap-1.5">
-          {items.map((item, idx) => (
-            <button
-              key={item.id}
-              onClick={() => setCurrentIndex(idx)}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                idx === currentIndex
-                  ? "w-6 bg-amber-400"
-                  : "w-2 bg-stone-700 hover:bg-stone-500"
-              }`}
-              title={`Switch to ${categoryLabels[item.category] || item.title}`}
-              aria-label={`Go to slide ${idx + 1}`}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Animated Card Container */}
-      <div className="surface-card rounded-xl overflow-hidden border border-white/[0.08] shadow-2xl relative min-h-[460px]">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentProject.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-            className="flex flex-col h-full"
-          >
-            {/* Image banner */}
-            <div className="relative h-56 border-b border-white/[0.05] overflow-hidden bg-stone-950">
-              <img
-                src={currentProject.thumbnail}
-                alt={currentProject.title}
-                className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
-                loading="eager"
-              />
-              <span className="absolute top-3 left-3 text-[10px] px-2.5 py-1 rounded bg-stone-950/85 text-amber-400 border border-amber-500/30 font-semibold tracking-wider uppercase backdrop-blur-sm">
-                {categoryLabels[currentProject.category] || currentProject.category}
-              </span>
-              <span className="absolute top-3 right-3 text-[10px] px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold backdrop-blur-sm flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
-                Featured
-              </span>
-            </div>
-
-            {/* Content */}
-            <div className="p-5 flex-1 flex flex-col justify-between">
-              <div>
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <h3 className="text-sm font-semibold text-stone-100 leading-snug">
-                    {currentProject.title}
-                  </h3>
-                  <span className="flex items-center gap-1 text-[11px] text-amber-400 shrink-0 bg-stone-900/80 px-2 py-0.5 rounded border border-stone-800">
-                    <Star className="w-3 h-3 fill-amber-400" />
-                    {currentProject.rating}
-                    <span className="text-stone-500">({currentProject.reviewsCount})</span>
-                  </span>
-                </div>
-
-                <p className="text-stone-400 text-xs leading-relaxed mb-4 line-clamp-2">
-                  {currentProject.description}
-                </p>
-
-                <div className="flex items-center gap-1.5 mb-5 flex-wrap">
-                  {currentProject.techStack.slice(0, 4).map(tech => (
-                    <span
-                      key={tech}
-                      className="text-[9px] px-2 py-0.5 bg-stone-800/80 rounded text-stone-300 border border-stone-700/60"
-                    >
-                      {tech}
-                    </span>
-                  ))}
-                  {currentProject.techStack.length > 4 && (
-                    <span className="text-[9px] px-2 py-0.5 bg-stone-800/80 rounded text-stone-500 border border-stone-700/60">
-                      +{currentProject.techStack.length - 4}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-3.5 border-t border-white/[0.05] mt-auto">
-                <div>
-                  <span className="text-[10px] text-stone-500 uppercase tracking-wider block">Price</span>
-                  <span className="text-base font-bold text-amber-500">
-                    ₹{currentProject.price.toLocaleString("en-IN")}
-                  </span>
-                </div>
-                <Link href={`/marketplace?category=${currentProject.category}`}>
-                  <Button size="sm" variant="secondary" as="div">
-                    View in marketplace <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </div>
-  );
-}
-
-// ─── Hero project card — shown in the right half of the hero ───────────────
-function HeroProjectCard({ project }: { project: Project }) {
-  return (
-    <div className="surface-card rounded-xl overflow-hidden">
-      {/* Image */}
-      <div className="relative h-52 border-b border-white/[0.05]">
-        <img
-          src={project.thumbnail}
-          alt={project.title}
-          className="w-full h-full object-cover"
-          loading="eager"
-        />
-        <span className="absolute top-3 left-3 text-[10px] px-2 py-1 rounded bg-stone-950/80 text-amber-400 border border-amber-500/20 font-semibold tracking-wider uppercase">
-          {project.category}
-        </span>
-        {project.featured === "banner" && (
-          <span className="absolute top-3 right-3 text-[10px] px-2 py-1 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-semibold">
-            Featured
-          </span>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <h3 className="text-sm font-semibold text-stone-100 leading-snug">{project.title}</h3>
-          <span className="flex items-center gap-1 text-[11px] text-amber-400 shrink-0">
-            <Star className="w-3 h-3 fill-amber-400" />
-            {project.rating}
-            <span className="text-stone-600">({project.reviewsCount})</span>
-          </span>
-        </div>
-
-        <p className="text-stone-500 text-xs leading-relaxed mb-4 line-clamp-2">
-          {project.description}
-        </p>
-
-        <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-          {project.techStack.slice(0, 4).map(tech => (
-            <span key={tech} className="text-[9px] px-2 py-0.5 bg-stone-800/80 rounded text-stone-400 border border-stone-700/60">
-              {tech}
-            </span>
-          ))}
-          {project.techStack.length > 4 && (
-            <span className="text-[9px] px-2 py-0.5 bg-stone-800/80 rounded text-stone-600 border border-stone-700/60">
-              +{project.techStack.length - 4}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between pt-3 border-t border-white/[0.05]">
-          <span className="text-base font-bold text-amber-500">
-            ₹{project.price.toLocaleString("en-IN")}
-          </span>
-          <Link href="/marketplace">
-            <Button size="sm" variant="secondary" as="div">
-              View in marketplace
-            </Button>
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Stats item ───────────────────────────────────────────────────────────
+// ─── Stats item ─────────────────────────────────────────────────────────────
 function StatItem({ value, label }: { value: string; label: string }) {
   return (
     <div className="flex items-baseline gap-2">
       <span className="text-2xl font-bold text-stone-100">{value}</span>
-      <span className="text-stone-600 text-sm">{label}</span>
+      <span className="text-stone-400 text-sm">{label}</span>
     </div>
   );
 }
 
-// ─── Theme styling map for Category Cards ───────────────────────────────────
+// ─── Theme styling map for Category Cards ──────────────────────────────────
 const CATEGORY_THEMES: Record<string, {
   gradient: string;
   glow: string;
@@ -644,14 +667,13 @@ function HomeCategoryGrid({
   countByCategory: Record<string, number>;
   onCategoryClick: (id: string) => void;
 }) {
-  // Sort categories by project count descending, then preserve original order
   const sorted = [...categories].sort(
     (a, b) => (countByCategory[b.id] ?? 0) - (countByCategory[a.id] ?? 0)
   );
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-      {sorted.map((cat, i) => {
+      {sorted.map((cat) => {
         const count = countByCategory[cat.id] ?? 0;
         const Icon = cat.icon;
         const theme = CATEGORY_THEMES[cat.id] || {
@@ -662,16 +684,11 @@ function HomeCategoryGrid({
         };
 
         return (
-          <motion.button
+          <button
             key={cat.id}
             onClick={() => onCategoryClick(cat.id)}
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-30px" }}
-            transition={{ duration: 0.35, delay: i * 0.04, ease: [0.16, 1, 0.3, 1] }}
-            className={`group relative flex flex-col justify-between p-5 rounded-2xl border border-white/10 bg-gradient-to-b from-[#111728]/95 via-[#0c1220]/95 to-[#070b14]/95 ${theme.hoverBorder} ${theme.glow} shadow-xl hover:-translate-y-1.5 transition-all duration-300 text-left overflow-hidden`}
+            className={`group relative flex flex-col justify-between p-5 rounded-2xl border border-white/10 bg-gradient-to-b from-[#111728]/95 via-[#0c1220]/95 to-[#070b14]/95 ${theme.hoverBorder} ${theme.glow} shadow-xl hover:-translate-y-1.5 transition-all duration-300 text-left overflow-hidden cursor-pointer`}
           >
-            {/* Top row: Icon Badge & Project Count */}
             <div>
               <div className="flex items-center justify-between gap-3 mb-4">
                 <div
@@ -692,12 +709,10 @@ function HomeCategoryGrid({
                 </span>
               </div>
 
-              {/* Title */}
               <h3 className="font-bold text-base text-white group-hover:text-amber-300 transition-colors tracking-tight mb-2">
                 {cat.name}
               </h3>
 
-              {/* Subcategories preview tags */}
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {cat.subCategories.slice(0, 3).map(sub => (
                   <span
@@ -715,19 +730,18 @@ function HomeCategoryGrid({
               </div>
             </div>
 
-            {/* Bottom Action Footer */}
             <div className="pt-3 border-t border-white/[0.07] flex items-center justify-between text-xs font-semibold text-gray-400 group-hover:text-cyan-300 transition-colors">
               <span>Explore category</span>
               <ArrowRight className="w-3.5 h-3.5 transform transition-transform duration-200 group-hover:translate-x-1" />
             </div>
-          </motion.button>
+          </button>
         );
       })}
     </div>
   );
 }
 
-// ─── Project card — used by the trending/inventory section ────────────────
+// ─── Project card — used by the trending inventory section ───────────────────
 function ProjectCard({
   project,
   imageHeight = "h-48",

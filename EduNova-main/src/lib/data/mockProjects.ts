@@ -27,6 +27,7 @@ export interface Project {
   driveUrl?: string;
   demoVideoUrl?: string;
   finalDeliverables?: string[];
+  deliverables?: import("./deliverables").ProjectDeliverable[];
   githubUrl?: string;
   readyToDownload?: boolean;
 
@@ -816,20 +817,51 @@ export const getAllProjectsForAdmin = async (): Promise<Project[]> => {
  */
 export const getAllProjects = getPublicProjects;
 
+export function notifyProjectsSync() {
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent("edunova_projects_updated"));
+      localStorage.setItem("edunova_projects_sync_time", Date.now().toString());
+    } catch {}
+  }
+}
+
 export const approveProject = async (id: string): Promise<void> => {
   try {
     await updateDoc(doc(db, "projects", id), { status: "approved" });
   } catch (err) {
-    console.error("Error approving project:", err);
+    console.error("Error approving project in Firestore:", err);
   }
+  const idx = projectsData.findIndex(p => p.id === id);
+  if (idx !== -1) projectsData[idx] = { ...projectsData[idx], status: "approved" };
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem("edunova_project_overrides");
+      const map = cached ? JSON.parse(cached) : {};
+      map[id] = { ...(map[id] || {}), status: "approved" };
+      localStorage.setItem("edunova_project_overrides", JSON.stringify(map));
+    } catch {}
+  }
+  notifyProjectsSync();
 };
 
 export const rejectProject = async (id: string): Promise<void> => {
   try {
     await updateDoc(doc(db, "projects", id), { status: "rejected" });
   } catch (err) {
-    console.error("Error rejecting project:", err);
+    console.error("Error rejecting project in Firestore:", err);
   }
+  const idx = projectsData.findIndex(p => p.id === id);
+  if (idx !== -1) projectsData[idx] = { ...projectsData[idx], status: "rejected" };
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem("edunova_project_overrides");
+      const map = cached ? JSON.parse(cached) : {};
+      map[id] = { ...(map[id] || {}), status: "rejected" };
+      localStorage.setItem("edunova_project_overrides", JSON.stringify(map));
+    } catch {}
+  }
+  notifyProjectsSync();
 };
 
 export const deleteProject = async (id: string): Promise<void> => {
@@ -838,6 +870,18 @@ export const deleteProject = async (id: string): Promise<void> => {
   } catch (err) {
     console.error("Error deleting project:", err);
   }
+  projectsData = projectsData.filter(p => p.id !== id);
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem("edunova_project_overrides");
+      if (cached) {
+        const map = JSON.parse(cached);
+        delete map[id];
+        localStorage.setItem("edunova_project_overrides", JSON.stringify(map));
+      }
+    } catch {}
+  }
+  notifyProjectsSync();
 };
 
 export const setProjectFeatured = async (id: string, featured: Project["featured"]): Promise<void> => {
@@ -846,14 +890,40 @@ export const setProjectFeatured = async (id: string, featured: Project["featured
   } catch (err) {
     console.error("Error setting featured status:", err);
   }
+  const idx = projectsData.findIndex(p => p.id === id);
+  if (idx !== -1) projectsData[idx] = { ...projectsData[idx], featured };
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem("edunova_project_overrides");
+      const map = cached ? JSON.parse(cached) : {};
+      map[id] = { ...(map[id] || {}), featured };
+      localStorage.setItem("edunova_project_overrides", JSON.stringify(map));
+    } catch {}
+  }
+  notifyProjectsSync();
 };
 
 export const addProject = async (project: Project): Promise<void> => {
+  try {
+    const { getPlatformSettings } = await import("./settings");
+    const settings = getPlatformSettings();
+    if (settings.autoApproveProjects && project.status === "pending") {
+      project.status = "approved";
+    }
+  } catch {}
+
   try {
     await setDoc(doc(db, "projects", project.id), project);
   } catch (err) {
     console.error("Error adding project:", err);
   }
+  const existingIdx = projectsData.findIndex(p => p.id === project.id);
+  if (existingIdx !== -1) {
+    projectsData[existingIdx] = project;
+  } else {
+    projectsData.unshift(project);
+  }
+  notifyProjectsSync();
 };
 
 export const updateProject = async (id: string, updates: Partial<Project>): Promise<boolean> => {
@@ -877,6 +947,7 @@ export const updateProject = async (id: string, updates: Partial<Project>): Prom
       } catch {}
     }
 
+    notifyProjectsSync();
     return true;
   } catch (err: any) {
     console.warn("[Projects] Notice updating project in Firestore (applying local override):", err?.message || err);
@@ -892,6 +963,7 @@ export const updateProject = async (id: string, updates: Partial<Project>): Prom
         localStorage.setItem("edunova_project_overrides", JSON.stringify(map));
       } catch {}
     }
+    notifyProjectsSync();
     return true;
   }
 };
@@ -929,6 +1001,7 @@ export const purgeRejectedProjects = async (): Promise<number> => {
     } catch {}
   }
 
+  notifyProjectsSync();
   return count;
 };
 

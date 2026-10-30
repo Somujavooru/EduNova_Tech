@@ -54,6 +54,7 @@ export async function GET(request: Request) {
   const orderId = url.searchParams.get("orderId");
   const rawUrl = url.searchParams.get("url");
   const format = url.searchParams.get("format");
+  const type = url.searchParams.get("type");
 
   if (!orderId && !rawUrl) {
     return NextResponse.json({ error: "Missing required parameter: orderId or url" }, { status: 400 });
@@ -74,7 +75,11 @@ export async function GET(request: Request) {
         });
       }
       const orderData = orderDoc.data();
-      screenshotUrl = orderData?.paymentScreenshot || "";
+      if (type === "final" && orderData?.finalPayment?.screenshot) {
+        screenshotUrl = orderData.finalPayment.screenshot;
+      } else {
+        screenshotUrl = orderData?.paymentScreenshot || "";
+      }
       userId = orderData?.userId || "";
       orderCreatedAt = orderData?.createdAt || "";
     }

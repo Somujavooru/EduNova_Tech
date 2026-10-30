@@ -14,8 +14,23 @@ export default function AdminReviewsDashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
-    getAllReviews().then(setAllReviews);
-    getAllProjectsForAdmin().then(setProjects);
+    const fetchReviews = () => {
+      getAllReviews().then(setAllReviews);
+      getAllProjectsForAdmin().then(setProjects);
+    };
+
+    fetchReviews();
+
+    window.addEventListener("edunova_reviews_updated", fetchReviews);
+    window.addEventListener("storage", fetchReviews);
+
+    const timer = setInterval(fetchReviews, 4000);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("edunova_reviews_updated", fetchReviews);
+      window.removeEventListener("storage", fetchReviews);
+    };
   }, []);
 
   const stats = useMemo(() => {

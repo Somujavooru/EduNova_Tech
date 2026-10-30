@@ -22,10 +22,12 @@ export interface ContactMessage {
 }
 
 export interface SocialMediaLinks {
+  [key: string]: { url: string; enabled: boolean };
   instagram: { url: string; enabled: boolean };
   linkedin: { url: string; enabled: boolean };
   twitter: { url: string; enabled: boolean };
   github: { url: string; enabled: boolean };
+  email: { url: string; enabled: boolean };
   youtube: { url: string; enabled: boolean };
   facebook: { url: string; enabled: boolean };
   telegram: { url: string; enabled: boolean };
@@ -38,7 +40,8 @@ const DEFAULT_SOCIALS: SocialMediaLinks = {
   linkedin: { url: "https://linkedin.com/company/edunova", enabled: true },
   twitter: { url: "https://twitter.com/edunova", enabled: true },
   github: { url: "https://github.com/edunova", enabled: true },
-  youtube: { url: "https://youtube.com/edunova", enabled: true },
+  email: { url: "mailto:edunovaforgessupport@gmail.com", enabled: true },
+  youtube: { url: "https://youtube.com/edunova", enabled: false },
   facebook: { url: "https://facebook.com/edunova", enabled: false },
   telegram: { url: "https://t.me/edunova", enabled: false },
   discord: { url: "https://discord.gg/edunova", enabled: false },
@@ -167,6 +170,8 @@ export async function saveContactMessage(msg: Omit<ContactMessage, "id" | "statu
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem(CONTACT_KEY, JSON.stringify(localList));
+      window.dispatchEvent(new CustomEvent("edunova_inquiries_updated"));
+      localStorage.setItem("edunova_inquiries_sync", Date.now().toString());
     } catch {}
   }
 
@@ -277,6 +282,12 @@ export async function replyToContactMessage(id: string, replyText: string, repli
     });
     if (res.ok) {
       const data = await res.json();
+      if (typeof window !== "undefined") {
+        try {
+          window.dispatchEvent(new CustomEvent("edunova_inquiries_updated"));
+          localStorage.setItem("edunova_inquiries_sync", Date.now().toString());
+        } catch {}
+      }
       return data.message || null;
     }
   } catch (err) {
@@ -302,7 +313,13 @@ export async function getUserInquiries(email: string): Promise<ContactMessage[]>
   return [];
 }
 
+import { getPlatformSettings, savePlatformSettings } from "@/lib/data/settings";
+
 export function getSocialLinks(): SocialMediaLinks {
+  const settings = getPlatformSettings();
+  if (settings.socialLinks) {
+    return settings.socialLinks as unknown as SocialMediaLinks;
+  }
   if (typeof window === "undefined") return DEFAULT_SOCIALS;
   try {
     const raw = localStorage.getItem(SOCIALS_KEY);
@@ -318,4 +335,6 @@ export function saveSocialLinks(links: SocialMediaLinks) {
       localStorage.setItem(SOCIALS_KEY, JSON.stringify(links));
     } catch {}
   }
+  // Persist to Firestore & server API so whole website stays in sync
+  savePlatformSettings({ socialLinks: links }).catch(() => {});
 }

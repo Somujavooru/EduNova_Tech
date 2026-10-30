@@ -13,6 +13,9 @@ import { compressImage } from "@/lib/imageUtils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getPlatformSettings, getEffectiveQrCodeUrl } from "@/lib/data/settings";
+import { EfMonogramLogo } from "./EfMonogramLogo";
+import { EduNovaForgeLogo } from "./EduNovaForgeLogo";
+import { ProjectDeliverablesSection } from "./ProjectDeliverablesSection";
 
 interface Props {
   project: Project;
@@ -35,6 +38,14 @@ export function CheckoutModal({ project, onClose }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Guards against rapid double-clicks submitting duplicate orders
   const isSubmitting = useRef(false);
+
+  const [platformSettings, setPlatformSettings] = useState(getPlatformSettings());
+
+  useEffect(() => {
+    const handleUpdate = () => setPlatformSettings(getPlatformSettings());
+    window.addEventListener("edunova_settings_updated", handleUpdate);
+    return () => window.removeEventListener("edunova_settings_updated", handleUpdate);
+  }, []);
 
   const isReady = isProjectReadyToDownload(project);
   const advanceAmount = Math.round(project.price * 0.25);
@@ -275,7 +286,7 @@ export function CheckoutModal({ project, onClose }: Props) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#0a0a1a] shadow-[0_0_60px_rgba(0,240,255,0.15)] my-auto text-left"
+          className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-[#0a0a1a] shadow-[0_0_60px_rgba(0,240,255,0.15)] my-auto text-left overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Close */}
@@ -290,6 +301,10 @@ export function CheckoutModal({ project, onClose }: Props) {
         {/* SUCCESS STATE */}
         {step === "submitted" ? (
           <div className="p-8 md:p-10 text-center">
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <EfMonogramLogo size="sm" />
+              <EduNovaForgeLogo size="sm" showTagline={false} />
+            </div>
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -311,12 +326,12 @@ export function CheckoutModal({ project, onClose }: Props) {
               <div className="flex items-center gap-2 mb-2">
                 <Clock className="w-5 h-5 text-yellow-400" />
                 <h3 className="text-sm font-bold text-yellow-400 uppercase tracking-wider">
-                  {!isReady ? "25% Advance Awaiting Verification" : "Awaiting Admin Approval"}
+                  {!isReady ? "25% Advance Awaiting Verification" : "Payment Verification Pending"}
                 </h3>
               </div>
               <p className="text-sm text-gray-400">
                 {!isReady
-                  ? "Our team will verify your 25% advance payment. Once verified, project development begins with live milestone tracking (Planning → Building → Testing) in your Dashboard. You'll be prompted to pay the remaining 75% when the project is finished and ready for delivery."
+                  ? "Our team will verify your 25% advance payment. Once verified, project development begins with live milestone tracking (Planning → Building → Testing) in your Dashboard. You'll be prompted to pay the remaining 75% balance when the project is finished and ready for delivery."
                   : "Our team will verify your payment within 24 hours. Once approved, you will receive the project files via your dashboard."}
               </p>
             </div>
@@ -331,7 +346,11 @@ export function CheckoutModal({ project, onClose }: Props) {
                 <span className="text-white">{project.title}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">{!isReady ? "25% Advance Paid" : "Amount"}</span>
+                <span className="text-gray-400">Total Project Amount</span>
+                <span className="text-gray-300 font-semibold">₹{project.price.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">{!isReady ? "25% Advance Paid" : "Amount Paid"}</span>
                 <span className="text-[var(--color-neon-purple)] font-bold">₹{payableAmount.toLocaleString("en-IN")}</span>
               </div>
               {!isReady && (
@@ -351,8 +370,8 @@ export function CheckoutModal({ project, onClose }: Props) {
                 <span className="text-green-400">{fileName}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Status</span>
-                <span className="text-yellow-400 font-semibold">Pending Verification</span>
+                <span className="text-gray-400">Payment Verification Status</span>
+                <span className="text-yellow-400 font-semibold">Payment Verification Pending</span>
               </div>
             </div>
 
@@ -377,6 +396,17 @@ export function CheckoutModal({ project, onClose }: Props) {
         ) : (
           /* CHECKOUT STATE */
           <div className="p-6 md:p-8">
+            {/* EduNova Forge Billing Brand Bar */}
+            <div className="flex items-center justify-between pb-3.5 mb-5 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <EfMonogramLogo size="sm" />
+                <EduNovaForgeLogo size="sm" showTagline={false} />
+              </div>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                Official Billing
+              </span>
+            </div>
+
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--color-neon-purple)] to-[var(--color-neon-blue)] flex items-center justify-center">
                 {!isReady ? <Rocket className="w-5 h-5 text-white" /> : <ShoppingCart className="w-5 h-5 text-white" />}
@@ -393,13 +423,23 @@ export function CheckoutModal({ project, onClose }: Props) {
               </div>
             </div>
 
+            {/* Included Deliverables Section Preview */}
+            <div className="mb-5 p-4 rounded-xl bg-white/[0.02] border border-white/10">
+              <ProjectDeliverablesSection
+                project={project}
+                mode="order"
+                titleVariant="included_with_project"
+                showFolderTree={false}
+              />
+            </div>
+
             {/* Order Summary */}
             <div className="rounded-xl bg-white/5 border border-white/10 p-4 mb-5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Order Summary</h3>
                 {!isReady && (
                   <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold uppercase tracking-wider">
-                    Build on Order
+                    Build on Order (25% Advance)
                   </span>
                 )}
               </div>
@@ -407,18 +447,18 @@ export function CheckoutModal({ project, onClose }: Props) {
                 <span className="text-sm text-gray-300 font-semibold">{project.title}</span>
               </div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-xs text-gray-500">By: EduNova Team</span>
+                <span className="text-xs text-gray-500">By: {project.sellerName || "EduNova Forge Team"}</span>
                 <span className="text-xs text-gray-500 capitalize">{project.category}</span>
               </div>
               {!isReady ? (
                 <div className="pt-3 border-t border-white/10 space-y-2">
                   <div className="flex justify-between text-xs text-gray-400">
                     <span>Total Project Cost</span>
-                    <span className="text-gray-300">₹{project.price.toLocaleString("en-IN")}</span>
+                    <span className="text-gray-300 font-semibold">₹{project.price.toLocaleString("en-IN")}</span>
                   </div>
                   <div className="flex justify-between text-xs text-gray-400">
                     <span>Remaining Balance (Due on delivery)</span>
-                    <span className="text-blue-400 font-medium">₹{balanceAmount.toLocaleString("en-IN")}</span>
+                    <span className="text-blue-400 font-medium">₹{balanceAmount.toLocaleString("en-IN")} (75%)</span>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t border-white/5">
                     <span className="text-sm font-semibold text-amber-400">Advance Due Now (25%)</span>
@@ -446,7 +486,7 @@ export function CheckoutModal({ project, onClose }: Props) {
               {/* QR Code */}
               <div className="w-44 h-44 mx-auto mb-4 rounded-xl bg-white p-2.5 flex items-center justify-center shadow-lg border border-white/20">
                 <img
-                  src={getEffectiveQrCodeUrl(payableAmount)}
+                  src={getEffectiveQrCodeUrl(payableAmount, platformSettings)}
                   alt="UPI QR Code"
                   className="w-full h-full rounded-lg object-contain"
                 />
@@ -455,7 +495,7 @@ export function CheckoutModal({ project, onClose }: Props) {
               <p className="text-center text-xs text-gray-400 mb-2">Scan QR or pay to UPI ID:</p>
               <div className="text-center mb-4">
                 <span className="inline-block px-4 py-2 rounded-lg bg-[var(--color-neon-blue)]/10 border border-[var(--color-neon-blue)]/30 text-[var(--color-neon-blue)] font-mono text-sm font-bold select-all">
-                  {getPlatformSettings().upiId || "edunova@paytm"}
+                  {platformSettings.upiId || "edunova@paytm"}
                 </span>
               </div>
 

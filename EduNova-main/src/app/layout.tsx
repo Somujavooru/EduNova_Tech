@@ -15,8 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EduNova | Where Student Ideas Become Reality",
-  description: "A futuristic student-focused engineering innovation and project marketplace. Buy, sell, and request high-quality projects in a startup ecosystem for students.",
+  title: "EduNova Forge | Discover • Build • Bring Ideas to Life",
+  description: "EduNova Forge — Discover • Build • Bring Ideas to Life. A futuristic student-focused engineering innovation and project marketplace. Buy, sell, and request high-quality projects in a startup ecosystem for students.",
+  icons: {
+    icon: "/ef-logo.png",
+    shortcut: "/ef-logo.png",
+    apple: "/ef-logo.png",
+  },
 };
 
 export default function RootLayout({

@@ -1,6 +1,7 @@
 import { db } from "../firebase";
 import { collection, doc, getDocs, getDoc, setDoc, updateDoc, query, where, writeBatch } from "firebase/firestore";
 import { logger } from "../logger";
+import { generateId } from "@/lib/idUtils";
 
 export interface Referral {
   id: string;
@@ -32,8 +33,7 @@ export async function createReferral(referrerCode: string, newUserId: string): P
   const snap2 = await getDocs(q2);
   if (!snap2.empty) return false;
 
-  // ── 3. Create the referral doc ───────────────────────────────────────────
-  const id = `REF-${crypto.randomUUID().replace(/-/g, "").substring(0, 10).toUpperCase()}`;
+  const id = generateId("REF");
   const ref: Referral = {
     id,
     referrerId: referrer,
@@ -69,23 +69,13 @@ export async function unlockReferralReward(referredUserId: string, projectId: st
       
       if (rewardAmount <= 0) return;
 
-      // Check referrer's limits before applying reward
+      // Unlimited referrals: no cap, credit referrer for every successful referral
       const userRef = doc(db, "users", referralData.referrerId);
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
         const userData = userSnap.data();
-        
-        if (userData.referralCompleted) {
-          logger.log("Referrer already completed max allowed referrals. Reward skipped.");
-          return;
-        }
 
-        if (userData.rewardRedeemed) {
-          logger.log("Referrer already redeemed their reward. Cannot re-unlock. Skipped.");
-          return;
-        }
-
-        // Proceed to unlock
+        // Proceed to unlock referral record
         await updateDoc(doc(db, "referrals", referralData.id), {
           status: "successful",
           projectId,
@@ -94,15 +84,15 @@ export async function unlockReferralReward(referredUserId: string, projectId: st
           updatedAt: new Date().toISOString()
         });
 
+        // Accumulate discount without any referral count limit
         const newDiscount = (userData.availableDiscount || 0) + rewardAmount;
         const newCount = (userData.successfulReferralCount || 0) + 1;
-        const maxAllowed = userData.maxReferralAllowed || 1;
-        const isCompleted = newCount >= maxAllowed;
 
         await updateDoc(userRef, { 
           availableDiscount: newDiscount,
           successfulReferralCount: newCount,
-          referralCompleted: isCompleted
+          referralCompleted: false, // Keep referral program permanently open
+          rewardRedeemed: false
         });
 
         // Send notification to referrer
@@ -154,8 +144,33 @@ export async function getAllReferrals(): Promise<Referral[]> {
  * Writes users/{uid}.referralUnlocked = true and indexes referralCodes/{code} atomically.
  */
 export async function unlockUserReferralCode(userId: string): Promise<string | null> {
+  if (!userId) return null;
+
+  // 1. Primary: Server-side Admin SDK API (bypasses client Firestore rule restrictions)
   try {
-    if (!userId) return null;
+    const { auth } = await import("../firebase");
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch("/api/referrals/unlock", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ targetUserId: userId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.referralCode) return data.referralCode;
+      }
+    }
+  } catch (apiErr) {
+    console.warn("[Referrals] Server API unlock notice:", apiErr);
+  }
+
+  // 2. Fallback: Client-side writeBatch
+  try {
     const userRef = doc(db, "users", userId);
     const userSnap = await getDoc(userRef);
     if (!userSnap.exists()) return null;

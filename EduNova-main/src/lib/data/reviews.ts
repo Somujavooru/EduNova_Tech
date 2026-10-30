@@ -1,7 +1,8 @@
 // EduNova Review & Comment System — Data Layer
 
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy } from "firebase/firestore";
+import { generateId } from "@/lib/idUtils";
 
 export interface ReviewCategories {
   quality: number;
@@ -46,6 +47,15 @@ export interface Comment {
   createdAt: string;
   isAdminReply?: boolean;
   isSolution?: boolean;
+}
+
+export function notifyReviewsSync() {
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent("edunova_reviews_updated"));
+      localStorage.setItem("edunova_reviews_sync_time", Date.now().toString());
+    } catch {}
+  }
 }
 
 export async function hasUserPurchased(userId: string, projectId: string): Promise<boolean> {
@@ -174,7 +184,7 @@ export async function submitReview(data: {
     const existing = await getUserReviewForProject(data.userId, data.projectId);
     if (existing) return null;
 
-    const id = `REV-${crypto.randomUUID().replace(/-/g, "").substring(0, 10).toUpperCase()}`;
+    const id = generateId("REV");
     const verifiedPurchase = await hasUserPurchased(data.userId, data.projectId);
 
     const newReview: Review = {
@@ -198,6 +208,7 @@ export async function submitReview(data: {
     };
 
     await setDoc(doc(db, "reviews", id), newReview);
+    notifyReviewsSync();
     return newReview;
   } catch (err) {
     console.error("Firebase Error submitting review:", err);
@@ -223,6 +234,7 @@ export async function editReview(reviewId: string, userId: string, updates: { ra
     review.updatedAt = new Date().toISOString();
 
     await updateDoc(docRef, { ...review });
+    notifyReviewsSync();
     return review;
   } catch (err) {
     console.error("Firebase Error editing review:", err);
@@ -237,6 +249,7 @@ export async function deleteReview(reviewId: string, userId: string): Promise<bo
     if (!docSnap.exists() || docSnap.data().userId !== userId) return false;
 
     await deleteDoc(docRef);
+    notifyReviewsSync();
     return true;
   } catch (err) {
     console.error("Firebase Error deleting review:", err);
@@ -266,6 +279,7 @@ export async function toggleHelpful(reviewId: string, userId: string): Promise<R
     } catch (err: any) {
       console.warn("[Reviews] Notice updating helpful in Firestore (using local persistence):", err?.message || err);
     }
+    notifyReviewsSync();
     return review;
   } catch (err: any) {
     console.warn("[Reviews] Error toggling helpful:", err?.message || err);
@@ -280,6 +294,21 @@ export async function toggleHelpful(reviewId: string, userId: string): Promise<R
 export async function getCommentsByProject(projectId: string): Promise<Comment[]> {
   try {
     if (!projectId) return [];
+
+    // Try server API first
+    try {
+      const res = await fetch(`/api/comments?projectId=${encodeURIComponent(projectId)}`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.comments)) {
+          return data.comments;
+        }
+      }
+    } catch {}
+
+    // Fallback to client SDK
     const q = query(collection(db, "comments"), where("projectId", "==", projectId));
     const querySnapshot = await getDocs(q);
     const comments: Comment[] = [];
@@ -292,7 +321,7 @@ export async function getCommentsByProject(projectId: string): Promise<Comment[]
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   } catch (err) {
-    console.error("Firebase Error fetching comments:", err);
+    console.error("Error fetching comments:", err);
     return [];
   }
 }
@@ -306,7 +335,37 @@ export async function submitComment(data: {
   isAdminReply?: boolean;
 }): Promise<Comment | null> {
   try {
-    const id = `CMT-${crypto.randomUUID().replace(/-/g, "").substring(0, 10).toUpperCase()}`;
+    // 1. Try server API with user ID token
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch("/api/comments", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            projectId: data.projectId,
+            text: data.text,
+            parentId: data.parentId || null,
+          }),
+        });
+        if (res.ok) {
+          const result = await res.json();
+          if (result.comment) {
+            notifyReviewsSync();
+            return result.comment;
+          }
+        }
+      } catch (apiErr) {
+        console.warn("[Comments API] API route notice, trying Firestore directly:", apiErr);
+      }
+    }
+
+    // 2. Direct Firestore fallback
+    const id = generateId("CMT");
     const newComment: Comment = {
       id,
       projectId: data.projectId,
@@ -322,9 +381,10 @@ export async function submitComment(data: {
       isSolution: false,
     };
     await setDoc(doc(db, "comments", id), newComment);
+    notifyReviewsSync();
     return newComment;
   } catch (err) {
-    console.error("Firebase Error submitting comment:", err);
+    console.error("Error submitting comment:", err);
     return null;
   }
 }
@@ -332,15 +392,33 @@ export async function submitComment(data: {
 export async function deleteComment(commentId: string): Promise<boolean> {
   try {
     if (!commentId) return false;
-    // Also delete replies
+
+    // Try server API first
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch(`/api/comments?id=${encodeURIComponent(commentId)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        if (res.ok) {
+          notifyReviewsSync();
+          return true;
+        }
+      } catch {}
+    }
+
+    // Fallback to client SDK
     const q = query(collection(db, "comments"), where("parentId", "==", commentId));
     const querySnapshot = await getDocs(q);
     const batchPromises = querySnapshot.docs.map(d => deleteDoc(doc(db, "comments", d.id)));
     batchPromises.push(deleteDoc(doc(db, "comments", commentId)));
     await Promise.all(batchPromises);
+    notifyReviewsSync();
     return true;
   } catch (err) {
-    console.error("Firebase Error deleting comment:", err);
+    console.error("Error deleting comment:", err);
     return false;
   }
 }
@@ -350,6 +428,7 @@ export async function clearAllComments(): Promise<boolean> {
     const snap = await getDocs(collection(db, "comments"));
     const deletePromises = snap.docs.map(d => deleteDoc(d.ref));
     await Promise.all(deletePromises);
+    notifyReviewsSync();
     return true;
   } catch (err) {
     console.error("Firebase Error clearing all comments:", err);
@@ -359,6 +438,24 @@ export async function clearAllComments(): Promise<boolean> {
 
 export async function toggleLikeComment(commentId: string, userId: string): Promise<Comment | null> {
   try {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch("/api/comments", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ commentId, action: "like" }),
+        });
+        if (res.ok) {
+          notifyReviewsSync();
+        }
+      } catch {}
+    }
+
     const docRef = doc(db, "comments", commentId);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
@@ -376,9 +473,8 @@ export async function toggleLikeComment(commentId: string, userId: string): Prom
 
     try {
       await updateDoc(docRef, { likedBy: updatedLikedBy, likes: updatedLikes });
-    } catch (err: any) {
-      console.warn("[Reviews] Notice updating like in Firestore (using local state fallback):", err?.message || err);
-    }
+    } catch {}
+    notifyReviewsSync();
     return comment;
   } catch (err: any) {
     console.warn("[Reviews] Error toggling like:", err?.message || err);
@@ -388,6 +484,18 @@ export async function toggleLikeComment(commentId: string, userId: string): Prom
 
 export async function pinComment(commentId: string): Promise<Comment | null> {
   try {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const idToken = await currentUser.getIdToken();
+        await fetch("/api/comments", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ commentId, action: "pin" }),
+        });
+      } catch {}
+    }
+
     const docRef = doc(db, "comments", commentId);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
@@ -395,15 +503,28 @@ export async function pinComment(commentId: string): Promise<Comment | null> {
     const comment = docSnap.data() as Comment;
     comment.pinned = !comment.pinned;
     await updateDoc(docRef, { pinned: comment.pinned });
+    notifyReviewsSync();
     return comment;
   } catch (err) {
-    console.error("Firebase Error pinning comment:", err);
+    console.error("Error pinning comment:", err);
     return null;
   }
 }
 
 export async function toggleSolution(commentId: string): Promise<Comment | null> {
   try {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const idToken = await currentUser.getIdToken();
+        await fetch("/api/comments", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ commentId, action: "solution" }),
+        });
+      } catch {}
+    }
+
     const docRef = doc(db, "comments", commentId);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
@@ -411,12 +532,15 @@ export async function toggleSolution(commentId: string): Promise<Comment | null>
     const comment = docSnap.data() as Comment;
     comment.isSolution = !comment.isSolution;
     await updateDoc(docRef, { isSolution: comment.isSolution });
+    notifyReviewsSync();
     return comment;
   } catch (err) {
-    console.error("Firebase Error toggling solution:", err);
+    console.error("Error toggling solution on comment:", err);
     return null;
   }
 }
+
+
 
 export async function getAllComments(): Promise<Comment[]> {
   try {

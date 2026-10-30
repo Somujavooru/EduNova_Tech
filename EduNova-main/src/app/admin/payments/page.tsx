@@ -4,8 +4,34 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAllOrders, updateOrderStatus, deleteOrder, clearAllOrders, Order } from "@/lib/data/orders";
 import { updateCustomRequestFields } from "@/lib/data/customRequests";
-import { Trash2, CheckCircle, ExternalLink, RefreshCw, IndianRupee, ShieldAlert, Package, Calendar, Clock, CreditCard, ChevronDown, ChevronUp, Check, XCircle, Eye, Image as ImageIcon, X, Search, Receipt, FolderDown, FileSpreadsheet, Hash } from "lucide-react";
-import { doc, getDoc, updateDoc, writeBatch, collection, deleteDoc, onSnapshot } from "firebase/firestore";
+import {
+  Trash2,
+  CheckCircle,
+  ExternalLink,
+  RefreshCw,
+  IndianRupee,
+  ShieldAlert,
+  Package,
+  Calendar,
+  Clock,
+  CreditCard,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  XCircle,
+  Eye,
+  Image as ImageIcon,
+  X,
+  Search,
+  Receipt,
+  FolderDown,
+  FileSpreadsheet,
+  Hash,
+  Sparkles,
+  Layers,
+  ArrowRight
+} from "lucide-react";
+import { doc, getDoc, updateDoc, collection, onSnapshot } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { generateInvoice } from "@/lib/invoiceGenerator";
 import { downloadOrdersExcel } from "@/lib/exportOrders";
@@ -17,7 +43,7 @@ function StatusBadge({ status }: { status: Order["status"] }) {
     approved: { label: "Approved", icon: CheckCircle, color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30" },
     rejected: { label: "Rejected", icon: XCircle, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30" },
   };
-  const c = config[status];
+  const c = config[status] || config.pending;
   const Icon = c.icon;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${c.color} ${c.bg} border ${c.border}`}>
@@ -32,26 +58,46 @@ export default function AdminPaymentsPage() {
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [search, setSearch] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState("Payment Proof");
   const [isZoomed, setIsZoomed] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isLoadingImage, setIsLoadingImage] = useState(false);
+  const [isProcessingAction, setIsProcessingAction] = useState<string | null>(null);
 
-  const handleOpenScreenshot = async (order: Order) => {
+  const handleOpenScreenshot = async (order: Order, milestone: "advance" | "final" = "advance") => {
     setImageError(false);
     setIsZoomed(false);
     setIsLoadingImage(true);
     setPreviewImage("/loading"); // Open modal immediately
 
+    const isFinal = milestone === "final" || (order.finalPayment?.status === "pending" && Boolean(order.finalPayment?.screenshot));
+    const targetScreenshot = isFinal
+      ? (order.finalPayment?.screenshot || order.paymentScreenshot)
+      : order.paymentScreenshot;
+
+    const totalCost = order.totalProjectPrice || order.amount;
+    const advanceCost = order.advanceAmount || Math.round(totalCost * 0.25);
+    const balanceCost = order.finalPayment?.amount || order.balanceAmount || Math.max(0, totalCost - advanceCost);
+
+    if (isFinal) {
+      setPreviewTitle(`75% Final Balance Payment Proof (₹${balanceCost.toLocaleString("en-IN")}) • UTR: ${order.finalPayment?.utrNumber || order.finalUtrNumber || "N/A"}`);
+    } else if (order.orderType === "advance_payment") {
+      setPreviewTitle(`25% Advance Payment Proof (₹${advanceCost.toLocaleString("en-IN")}) • UTR: ${order.utrNumber || "N/A"}`);
+    } else {
+      setPreviewTitle(`100% Full Payment Proof (₹${order.amount.toLocaleString("en-IN")}) • UTR: ${order.utrNumber || "N/A"}`);
+    }
+
     try {
-      if (order.paymentScreenshot?.startsWith("data:image/")) {
-        setPreviewImage(order.paymentScreenshot);
+      if (targetScreenshot?.startsWith("data:image/")) {
+        setPreviewImage(targetScreenshot);
         setIsLoadingImage(false);
         return;
       }
 
       const currentUser = auth.currentUser;
       const token = currentUser ? await currentUser.getIdToken() : "";
-      const endpoint = `/api/admin/payments/screenshot?orderId=${order.id}${token ? `&token=${token}` : ""}`;
+      const typeParam = isFinal ? "&type=final" : "";
+      const endpoint = `/api/admin/payments/screenshot?orderId=${order.id}${typeParam}${token ? `&token=${token}` : ""}`;
       setPreviewImage(endpoint);
     } catch (err) {
       console.error("Failed to acquire token for screenshot:", err);
@@ -64,133 +110,259 @@ export default function AdminPaymentsPage() {
   const refresh = async () => setOrders(await getAllOrders());
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "orders"), (snap) => {
-      const orderList = snap.docs
-        .map((d) => ({ ...d.data(), id: d.id } as Order))
-        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      setOrders(orderList);
-    }, (err) => {
-      console.warn("[AdminPayments] Firestore notice:", err);
-    });
+    let unsub = () => {};
 
-    return () => unsub();
+    const fetchOrders = async () => {
+      try {
+        const orderList = await getAllOrders();
+        setOrders(orderList);
+      } catch (e) {}
+    };
+
+    fetchOrders();
+
+    try {
+      unsub = onSnapshot(
+        collection(db, "orders"),
+        (snap) => {
+          const orderList = snap.docs
+            .map((d) => ({ ...d.data(), id: d.id } as Order))
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          setOrders(orderList);
+        },
+        (err) => {
+          console.warn("[AdminPayments] Firestore notice (using polling):", err?.message);
+        }
+      );
+    } catch (e) {}
+
+    const handleSync = () => fetchOrders();
+    window.addEventListener("edunova_orders_updated", handleSync);
+    window.addEventListener("storage", handleSync);
+
+    const liveTimer = setInterval(fetchOrders, 3000);
+
+    return () => {
+      unsub();
+      clearInterval(liveTimer);
+      window.removeEventListener("edunova_orders_updated", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
   }, []);
 
-  const handleApprove = async (id: string) => {
-    const order = await updateOrderStatus(id, "approved");
-    if (order) {
-      if (order.orderType === "advance_payment" && order.customRequestId) {
-        await updateCustomRequestFields(order.customRequestId, {
-          status: "planning",
-          advancePayment: { amount: order.amount, status: "verified", utrNumber: order.utrNumber, screenshot: order.paymentScreenshot, verifiedAt: new Date().toISOString() },
-          trackingHistory: [
-            {
-              stage: "planning",
-              label: "Project Planning & Architecture",
-              progressPercent: 25,
-              notes: "25% Advance payment verified. Architecture planning and development initialized.",
-              completedAt: new Date().toISOString(),
-            }
-          ]
-        });
-      }
+  const handleApprove = async (id: string, milestone: "advance" | "final" = "advance") => {
+    setIsProcessingAction(id);
+    try {
+      const existing = orders.find((o) => o.id === id);
+      const isFinalApproval =
+        milestone === "final" ||
+        existing?.orderType === "final_payment" ||
+        existing?.finalPayment?.status === "pending";
 
-      if (order.orderType === "final_payment" && order.customRequestId) {
-        await updateCustomRequestFields(order.customRequestId, {
-          status: "delivered",
-          finalPayment: { amount: order.amount, status: "verified", utrNumber: order.utrNumber, screenshot: order.paymentScreenshot, verifiedAt: new Date().toISOString() },
-          trackingHistory: [
-            {
+      if (isFinalApproval) {
+        // Approve 75% Final Balance Payment
+        const now = new Date().toISOString();
+        const orderRef = doc(db, "orders", id);
+        await updateDoc(orderRef, {
+          status: "approved",
+          paymentVerificationStatus: "approved",
+          deliveryStatus: "delivered",
+          buildStage: "delivered",
+          deliveredAt: now,
+          updatedAt: now,
+          verifiedAt: now,
+          "finalPayment.status": "approved",
+          "finalPayment.verifiedAt": now,
+        });
+
+        const customReqId = existing?.customRequestId;
+        if (customReqId) {
+          const reqRef = doc(db, "custom_requests", customReqId);
+          const reqSnap = await getDoc(reqRef);
+          if (reqSnap.exists()) {
+            const reqData = reqSnap.data();
+            const history = reqData?.trackingHistory || [];
+            const filtered = history.filter((h: any) => h.stage !== "delivered");
+            filtered.push({
               stage: "delivered",
               label: "Project Delivered & Files Unlocked",
               progressPercent: 100,
-              notes: "Final 75% payment verified. Google Drive links and project deliverables unlocked.",
-              completedAt: new Date().toISOString(),
-            }
-          ]
-        });
-      }
+              notes: "Final 75% payment verified. Google Drive links and all deliverables unlocked.",
+              completedAt: now,
+            });
 
-      // Unlock referral code feature for THIS buyer whenever ANY order is approved
-      try {
-        const { unlockUserReferralCode, unlockReferralReward } = await import("@/lib/data/referrals");
-        await unlockUserReferralCode(order.userId);
-
-        // Compute actual total project value for reward calculation
-        let totalProjectValue = order.amount;
-        if (order.orderType === "advance_payment") {
-          totalProjectValue = order.amount * 4;
-          if (order.customRequestId) {
-            try {
-              const { getCustomRequestById } = await import("@/lib/data/customRequests");
-              const reqData = await getCustomRequestById(order.customRequestId);
-              if (reqData) {
-                const history = reqData.negotiationHistory || [];
-                const lastOffer = history.length > 0 ? history[history.length - 1] : null;
-                totalProjectValue = lastOffer ? lastOffer.price : (reqData.budget || order.amount * 4);
-              }
-            } catch (e) {
-              console.error("Failed to look up custom request for reward calc:", e);
-            }
+            await updateDoc(reqRef, {
+              status: "delivered",
+              "finalPayment.status": "verified",
+              "finalPayment.verifiedAt": now,
+              trackingHistory: filtered,
+              updatedAt: now,
+            });
           }
         }
 
-        unlockReferralReward(order.userId, order.customRequestId || order.projectId, order.id, totalProjectValue);
-      } catch (err) {
-        console.error("Failed to process referral unlock for user:", err);
-      }
+        if (existing) {
+          sendNotification("payment_approved", {
+            userName: existing.userName,
+            userEmail: existing.userEmail,
+            orderId: existing.id,
+            projectTitle: existing.projectTitle,
+          });
+          sendNotification("download_unlocked", {
+            userName: existing.userName,
+            userEmail: existing.userEmail,
+            orderId: existing.id,
+            projectTitle: existing.projectTitle,
+          });
+        }
+      } else {
+        // Standard 25% Advance or Marketplace 100% Approval
+        const order = await updateOrderStatus(id, "approved");
+        if (order) {
+          if (order.orderType === "advance_payment" && order.customRequestId) {
+            await updateCustomRequestFields(order.customRequestId, {
+              status: "planning",
+              advancePayment: {
+                amount: order.advanceAmount || order.amount,
+                status: "verified",
+                utrNumber: order.utrNumber,
+                screenshot: order.paymentScreenshot,
+                verifiedAt: new Date().toISOString(),
+              },
+              trackingHistory: [
+                {
+                  stage: "planning",
+                  label: "Project Planning & Architecture",
+                  progressPercent: 25,
+                  notes: "25% Advance payment verified. Architecture planning and development initialized.",
+                  completedAt: new Date().toISOString(),
+                },
+              ],
+            });
+          }
 
-      sendNotification("payment_approved", {
-        userName: order.userName,
-        userEmail: order.userEmail,
-        orderId: order.id,
-        projectTitle: order.projectTitle,
-      });
-      sendNotification("download_unlocked", {
-        userName: order.userName,
-        userEmail: order.userEmail,
-        orderId: order.id,
-        projectTitle: order.projectTitle,
-      });
+          // Unlock referral code feature
+          try {
+            const { unlockUserReferralCode, unlockReferralReward } = await import("@/lib/data/referrals");
+            await unlockUserReferralCode(order.userId);
+
+            let totalProjectValue = order.totalProjectPrice || order.amount;
+            if (order.orderType === "advance_payment") {
+              totalProjectValue = order.totalProjectPrice || order.amount * 4;
+            }
+            unlockReferralReward(order.userId, order.customRequestId || order.projectId, order.id, totalProjectValue);
+          } catch (err) {
+            console.error("Failed to process referral unlock for user:", err);
+          }
+
+          sendNotification("payment_approved", {
+            userName: order.userName,
+            userEmail: order.userEmail,
+            orderId: order.id,
+            projectTitle: order.projectTitle,
+          });
+        }
+      }
+    } finally {
+      setIsProcessingAction(null);
+      refresh();
     }
-    refresh();
   };
 
-  const handleReject = async (id: string) => {
-    const order = await updateOrderStatus(id, "rejected");
-    if (order) {
-      if (order.orderType === "advance_payment" && order.customRequestId) {
-        await updateCustomRequestFields(order.customRequestId, {
-          advancePayment: { amount: order.amount, status: "rejected", utrNumber: order.utrNumber, screenshot: order.paymentScreenshot }
+  const handleReject = async (id: string, milestone: "advance" | "final" = "advance") => {
+    setIsProcessingAction(id);
+    try {
+      const existing = orders.find((o) => o.id === id);
+      const isFinalReject =
+        milestone === "final" ||
+        existing?.orderType === "final_payment" ||
+        existing?.finalPayment?.status === "pending";
+
+      if (isFinalReject) {
+        const orderRef = doc(db, "orders", id);
+        await updateDoc(orderRef, {
+          "finalPayment.status": "rejected",
+          updatedAt: new Date().toISOString(),
         });
-      }
-      if (order.orderType === "final_payment" && order.customRequestId) {
-        await updateCustomRequestFields(order.customRequestId, {
-          finalPayment: { amount: order.amount, status: "rejected", utrNumber: order.utrNumber, screenshot: order.paymentScreenshot }
-        });
+        if (existing?.customRequestId) {
+          await updateCustomRequestFields(existing.customRequestId, {
+            finalPayment: {
+              amount: existing.finalPayment?.amount || 0,
+              status: "rejected",
+              utrNumber: existing.finalPayment?.utrNumber || "",
+              screenshot: existing.finalPayment?.screenshot || "",
+            },
+          });
+        }
+      } else {
+        const order = await updateOrderStatus(id, "rejected");
+        if (order && order.orderType === "advance_payment" && order.customRequestId) {
+          await updateCustomRequestFields(order.customRequestId, {
+            advancePayment: {
+              amount: order.advanceAmount || order.amount,
+              status: "rejected",
+              utrNumber: order.utrNumber,
+              screenshot: order.paymentScreenshot,
+            },
+          });
+        }
       }
 
-      sendNotification("payment_rejected", {
-        userName: order.userName,
-        userEmail: order.userEmail,
-        orderId: order.id,
-        projectTitle: order.projectTitle,
-      });
+      if (existing) {
+        sendNotification("payment_rejected", {
+          userName: existing.userName,
+          userEmail: existing.userEmail,
+          orderId: existing.id,
+          projectTitle: existing.projectTitle,
+        });
+      }
+    } finally {
+      setIsProcessingAction(null);
+      refresh();
     }
-    refresh();
   };
 
-  const filtered = orders.filter(o => {
-    const matchFilter = filter === "all" || o.status === filter;
-    const matchSearch = o.projectTitle.toLowerCase().includes(search.toLowerCase()) ||
-                        o.userName.toLowerCase().includes(search.toLowerCase()) ||
-                        o.id.toLowerCase().includes(search.toLowerCase());
-    return matchFilter && matchSearch;
-  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const filtered = orders
+    .filter((o) => {
+      const hasPendingFinal = o.finalPayment?.status === "pending";
+      const hasPendingAdvance = o.orderType === "advance_payment" && o.status === "pending";
+      const hasPendingMarketplace = (o.orderType === "marketplace" || !o.orderType) && o.status === "pending";
+      const isPending = hasPendingFinal || hasPendingAdvance || hasPendingMarketplace;
 
-  const totalRevenue = orders.filter(o => o.status === "approved").reduce((s, o) => s + o.amount, 0);
-  const pendingCount = orders.filter(o => o.status === "pending").length;
-  const approvedCount = orders.filter(o => o.status === "approved").length;
+      const isApproved = !isPending && o.status === "approved";
+      const isRejected = o.status === "rejected" || o.finalPayment?.status === "rejected";
+
+      let matchFilter = true;
+      if (filter === "pending") matchFilter = isPending;
+      else if (filter === "approved") matchFilter = isApproved;
+      else if (filter === "rejected") matchFilter = isRejected;
+
+      const matchSearch =
+        o.projectTitle.toLowerCase().includes(search.toLowerCase()) ||
+        o.userName.toLowerCase().includes(search.toLowerCase()) ||
+        o.id.toLowerCase().includes(search.toLowerCase()) ||
+        (o.utrNumber && o.utrNumber.toLowerCase().includes(search.toLowerCase())) ||
+        (o.finalPayment?.utrNumber && o.finalPayment.utrNumber.toLowerCase().includes(search.toLowerCase()));
+
+      return matchFilter && matchSearch;
+    })
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const totalRevenue = orders
+    .filter((o) => o.status === "approved")
+    .reduce((s, o) => {
+      const adv = o.advanceAmount || (o.orderType === "advance_payment" ? Math.round(o.amount * 0.25) : o.amount);
+      const fin = o.finalPayment?.status === "approved" ? o.finalPayment.amount : 0;
+      return s + (o.orderType === "advance_payment" ? adv + fin : o.amount);
+    }, 0);
+
+  const pendingCount = orders.filter(
+    (o) => o.finalPayment?.status === "pending" || o.status === "pending"
+  ).length;
+
+  const approvedCount = orders.filter(
+    (o) => o.status === "approved" && o.finalPayment?.status !== "pending"
+  ).length;
 
   return (
     <div>
@@ -201,12 +373,12 @@ export default function AdminPaymentsPage() {
           </div>
           <div>
             <h1 className="text-2xl font-black text-white">Payment Verification</h1>
-            <p className="text-gray-500 text-xs">Approve or reject payment screenshots</p>
+            <p className="text-gray-500 text-xs">Verify 25% advance and 75% final balance milestone payments</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => downloadOrdersExcel(orders, "EduNova_User_Orders.xlsx")}
+            onClick={() => downloadOrdersExcel(orders, "EduNova_Forge_User_Orders.xlsx")}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--color-neon-purple)]/10 border border-[var(--color-neon-purple)]/30 text-[var(--color-neon-purple)] text-xs font-bold hover:bg-[var(--color-neon-purple)]/20 transition-colors"
           >
             <FileSpreadsheet className="w-4 h-4" />
@@ -214,8 +386,10 @@ export default function AdminPaymentsPage() {
           </button>
           <button
             onClick={async () => {
-              await clearAllOrders();
-              setOrders([]);
+              if (confirm("Are you sure you want to clear all orders?")) {
+                await clearAllOrders();
+                setOrders([]);
+              }
             }}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors"
           >
@@ -267,14 +441,14 @@ export default function AdminPaymentsPage() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-300/60" />
           <input
             type="text"
-            placeholder="Search by project, buyer, or order ID..."
+            placeholder="Search by project, buyer, UTR, or order ID..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-black/40 border border-purple-500/20 text-white placeholder-purple-200/40 text-sm focus:outline-none focus:border-purple-400 focus:bg-purple-950/30 transition-all"
           />
         </div>
         <div className="flex gap-2">
-          {(["all", "pending", "approved", "rejected"] as const).map(f => {
+          {(["all", "pending", "approved", "rejected"] as const).map((f) => {
             const activeColors = {
               all: "bg-indigo-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border-indigo-400",
               pending: "bg-amber-600 text-white shadow-[0_0_15px_rgba(245,158,11,0.4)] border-amber-400",
@@ -309,7 +483,6 @@ export default function AdminPaymentsPage() {
           ) : (
             filtered.map((order, i) => {
               const PAYMENT_CARD_THEMES = [
-                // 0: Cyber Violet / Magenta
                 {
                   bg: "bg-gradient-to-br from-[#2a1347]/95 via-[#1a0c2e]/95 to-[#0e051a]/98",
                   border: "border-purple-500/45 hover:border-purple-400",
@@ -317,7 +490,6 @@ export default function AdminPaymentsPage() {
                   glow: "bg-purple-500/20",
                   priceGradient: "from-purple-300 via-pink-300 to-amber-200",
                 },
-                // 1: Electric Ocean / Cyan
                 {
                   bg: "bg-gradient-to-br from-[#0e2f52]/95 via-[#081e35]/95 to-[#040f1c]/98",
                   border: "border-cyan-500/45 hover:border-cyan-400",
@@ -325,7 +497,6 @@ export default function AdminPaymentsPage() {
                   glow: "bg-cyan-500/20",
                   priceGradient: "from-cyan-300 via-sky-300 to-indigo-200",
                 },
-                // 2: Vivid Emerald / Jade
                 {
                   bg: "bg-gradient-to-br from-[#0d402b]/95 via-[#08291b]/95 to-[#04140d]/98",
                   border: "border-emerald-500/45 hover:border-emerald-400",
@@ -333,7 +504,6 @@ export default function AdminPaymentsPage() {
                   glow: "bg-emerald-500/20",
                   priceGradient: "from-emerald-300 via-teal-300 to-green-200",
                 },
-                // 3: Warm Sunset Amber / Bronze
                 {
                   bg: "bg-gradient-to-br from-[#422509]/95 via-[#2b1705]/95 to-[#160b02]/98",
                   border: "border-amber-500/45 hover:border-amber-400",
@@ -343,6 +513,25 @@ export default function AdminPaymentsPage() {
                 },
               ];
               const theme = PAYMENT_CARD_THEMES[i % PAYMENT_CARD_THEMES.length];
+
+              // Milestone calculations
+              const totalCost = order.totalProjectPrice || order.amount;
+              const advanceCost = order.advanceAmount || Math.round(totalCost * 0.25);
+              const balanceCost =
+                order.finalPayment?.amount ||
+                order.balanceAmount ||
+                Math.max(0, totalCost - advanceCost);
+
+              const isFinalPending = order.finalPayment?.status === "pending";
+              const isAdvancePending = order.orderType === "advance_payment" && order.status === "pending";
+              const isMarketplacePending = (order.orderType === "marketplace" || !order.orderType) && order.status === "pending";
+
+              // Amount to verify for currently pending action
+              const payableNow = isFinalPending
+                ? balanceCost
+                : isAdvancePending
+                ? advanceCost
+                : order.amount;
 
               return (
                 <motion.div
@@ -358,27 +547,70 @@ export default function AdminPaymentsPage() {
                   <div className={`absolute -top-12 -right-12 w-48 h-48 rounded-full blur-3xl pointer-events-none ${theme.glow}`} />
 
                   {/* Top Header */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5 relative z-10">
-                    <div>
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-5 relative z-10">
+                    <div className="flex-1">
                       <h3 className="text-xl font-black text-white tracking-tight">{order.projectTitle}</h3>
-                      <div className="flex flex-wrap items-center gap-2.5 mt-1.5">
-                        <span className="text-[11px] text-gray-400 font-mono bg-black/40 px-2 py-0.5 rounded border border-white/10">{order.id}</span>
-                        <StatusBadge status={order.status} />
-                        {order.orderType === "advance_payment" && (
-                          <span className="px-2.5 py-0.5 rounded-md bg-purple-500/25 text-purple-200 border border-purple-400/40 text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                            Advance (25%)
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <span className="text-[11px] text-gray-400 font-mono bg-black/40 px-2 py-0.5 rounded border border-white/10">
+                          {order.id}
+                        </span>
+
+                        {/* Distinct Milestone Badges */}
+                        {isFinalPending ? (
+                          <span className="px-3 py-1 rounded-full bg-cyan-500/25 text-cyan-200 border border-cyan-400/50 text-[11px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5 animate-pulse">
+                            <Clock className="w-3.5 h-3.5 text-cyan-300" />
+                            Milestone 2: 75% Final Balance Payment (Pending Verification)
+                          </span>
+                        ) : isAdvancePending ? (
+                          <span className="px-3 py-1 rounded-full bg-amber-500/25 text-amber-200 border border-amber-400/50 text-[11px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5 animate-pulse">
+                            <Clock className="w-3.5 h-3.5 text-amber-300" />
+                            Milestone 1: 25% Advance Payment (Pending Verification)
+                          </span>
+                        ) : order.orderType === "advance_payment" ? (
+                          order.finalPayment?.status === "approved" ? (
+                            <span className="px-3 py-1 rounded-full bg-emerald-500/25 text-emerald-200 border border-emerald-400/50 text-[11px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-300" />
+                              Fully Paid (100%) • Files Delivered
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 rounded-full bg-purple-500/25 text-purple-200 border border-purple-400/50 text-[11px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5">
+                              <CheckCircle className="w-3.5 h-3.5 text-purple-300" />
+                              25% Advance Verified • Awaiting 75% Final Payment
+                            </span>
+                          )
+                        ) : (
+                          <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold uppercase tracking-wider">
+                            Direct 100% Marketplace Purchase
                           </span>
                         )}
-                        {order.orderType === "final_payment" && (
-                          <span className="px-2.5 py-0.5 rounded-md bg-cyan-500/25 text-cyan-200 border border-cyan-400/40 text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                            Final (75%)
-                          </span>
-                        )}
+
+                        <StatusBadge status={isFinalPending ? "pending" : order.status} />
                       </div>
                     </div>
-                    <p className={`text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r ${theme.priceGradient} drop-shadow-md`}>
-                      ₹{order.amount.toLocaleString("en-IN")}
-                    </p>
+
+                    {/* Exact Payable Amount Display */}
+                    <div className="text-left md:text-right">
+                      <p className={`text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r ${theme.priceGradient} drop-shadow-md`}>
+                        ₹{payableNow.toLocaleString("en-IN")}
+                      </p>
+                      <p className="text-[11px] text-gray-300 font-medium mt-0.5">
+                        {isFinalPending ? (
+                          <span className="text-cyan-300 font-bold">
+                            75% Balance to Verify (Total: ₹{totalCost.toLocaleString("en-IN")})
+                          </span>
+                        ) : isAdvancePending ? (
+                          <span className="text-amber-300 font-bold">
+                            25% Advance to Verify (Total: ₹{totalCost.toLocaleString("en-IN")})
+                          </span>
+                        ) : order.orderType === "advance_payment" ? (
+                          <span>
+                            Total Project Value (₹{advanceCost.toLocaleString("en-IN")} + ₹{balanceCost.toLocaleString("en-IN")})
+                          </span>
+                        ) : (
+                          <span>Full 100% Payment</span>
+                        )}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Details Grid */}
@@ -388,53 +620,125 @@ export default function AdminPaymentsPage() {
                       <p className="text-white font-bold truncate">{order.userName}</p>
                       <p className="text-gray-400 text-[11px] truncate">{order.userEmail}</p>
                     </div>
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 shadow-inner">
-                      <p className="text-amber-300/80 uppercase tracking-wider text-[10px] font-semibold mb-1">UTR Number</p>
-                      <p className="text-amber-300 font-mono font-bold text-sm flex items-center gap-1">
+
+                    <div className={`p-3 rounded-xl shadow-inner border ${isFinalPending ? "bg-cyan-500/10 border-cyan-500/30" : "bg-amber-500/10 border-amber-500/30"}`}>
+                      <p className={`uppercase tracking-wider text-[10px] font-semibold mb-1 ${isFinalPending ? "text-cyan-300" : "text-amber-300/80"}`}>
+                        {isFinalPending ? "75% Payment UTR" : "25% Advance UTR"}
+                      </p>
+                      <p className={`font-mono font-bold text-sm flex items-center gap-1 ${isFinalPending ? "text-cyan-300" : "text-amber-300"}`}>
                         <Hash className="w-3.5 h-3.5" />
-                        {order.utrNumber || "N/A"}
+                        {isFinalPending ? (order.finalPayment?.utrNumber || order.finalUtrNumber || "N/A") : (order.utrNumber || "N/A")}
                       </p>
                     </div>
+
                     <div className="p-3 rounded-xl bg-black/35 border border-white/10 shadow-inner">
-                      <p className="text-gray-400 uppercase tracking-wider text-[10px] font-semibold mb-1">Curated By</p>
-                      <p className="text-gray-200 font-medium">EduNova Team</p>
+                      <p className="text-gray-400 uppercase tracking-wider text-[10px] font-semibold mb-1">Milestone Stage</p>
+                      <p className="text-gray-200 font-bold">
+                        {order.orderType === "advance_payment" ? (
+                          isFinalPending ? "Milestone 2 (75% Balance)" : order.finalPayment?.status === "approved" ? "Delivered (100%)" : "Milestone 1 (25% Advance)"
+                        ) : (
+                          "Single Payment (100%)"
+                        )}
+                      </p>
+                      {order.orderType === "advance_payment" && (
+                        <p className="text-gray-400 text-[10px]">
+                          Adv: ₹{advanceCost.toLocaleString("en-IN")} • Bal: ₹{balanceCost.toLocaleString("en-IN")}
+                        </p>
+                      )}
                     </div>
+
                     <div className="p-3 rounded-xl bg-black/35 border border-white/10 shadow-inner">
                       <p className="text-gray-400 uppercase tracking-wider text-[10px] font-semibold mb-1">Category</p>
-                      <p className="text-gray-200 capitalize font-medium">{order.projectCategory}</p>
+                      <p className="text-gray-200 capitalize font-medium">{order.projectCategory || "General"}</p>
                     </div>
+
                     <div className="p-3 rounded-xl bg-black/35 border border-white/10 shadow-inner">
                       <p className="text-gray-400 uppercase tracking-wider text-[10px] font-semibold mb-1">Date & Time</p>
-                      <p className="text-gray-200 font-medium whitespace-nowrap">{new Date(order.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true })}</p>
+                      <p className="text-gray-200 font-medium whitespace-nowrap">
+                        {new Date(order.createdAt).toLocaleString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}
+                      </p>
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-white/10 relative z-10">
-                    <button
-                      onClick={() => handleOpenScreenshot(order)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-200 text-xs font-bold hover:bg-purple-500/30 transition-all shadow-sm"
-                    >
-                      <Eye className="w-4 h-4" /> View Screenshot
-                    </button>
+                  <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-white/10 relative z-10">
+                    {/* View Screenshot button (milestone-aware) */}
+                    {isFinalPending ? (
+                      <button
+                        onClick={() => handleOpenScreenshot(order, "final")}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-200 text-xs font-bold hover:bg-cyan-500/30 transition-all shadow-sm"
+                      >
+                        <Eye className="w-4 h-4 text-cyan-300" /> View 75% Payment Screenshot
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleOpenScreenshot(order, "advance")}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-200 text-xs font-bold hover:bg-purple-500/30 transition-all shadow-sm"
+                      >
+                        <Eye className="w-4 h-4 text-purple-300" /> View Screenshot
+                      </button>
+                    )}
 
-                    {order.status === "pending" && (
+                    {/* Pending Action Buttons */}
+                    {isFinalPending ? (
                       <>
                         <button
-                          onClick={() => handleApprove(order.id)}
-                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-stone-950 text-xs font-black transition-all shadow-[0_0_15px_rgba(34,197,94,0.4)]"
+                          disabled={isProcessingAction === order.id}
+                          onClick={() => handleApprove(order.id, "final")}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-stone-950 text-xs font-black transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)] disabled:opacity-50 cursor-pointer"
                         >
-                          <CheckCircle className="w-4 h-4" /> Approve
+                          <Check className="w-4 h-4" /> Approve 75% Payment & Unlock Files
                         </button>
                         <button
-                          onClick={() => handleReject(order.id)}
-                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold hover:bg-red-500/30 transition-colors"
+                          disabled={isProcessingAction === order.id}
+                          onClick={() => handleReject(order.id, "final")}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold hover:bg-red-500/30 transition-colors disabled:opacity-50 cursor-pointer"
                         >
-                          <XCircle className="w-4 h-4" /> Reject
+                          <XCircle className="w-4 h-4" /> Reject 75% Payment
                         </button>
                       </>
-                    )}
-                    {order.status === "approved" && (
+                    ) : isAdvancePending ? (
+                      <>
+                        <button
+                          disabled={isProcessingAction === order.id}
+                          onClick={() => handleApprove(order.id, "advance")}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 text-xs font-black transition-all shadow-[0_0_15px_rgba(245,158,11,0.4)] disabled:opacity-50 cursor-pointer"
+                        >
+                          <Check className="w-4 h-4" /> Approve 25% Advance & Start Build
+                        </button>
+                        <button
+                          disabled={isProcessingAction === order.id}
+                          onClick={() => handleReject(order.id, "advance")}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold hover:bg-red-500/30 transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          <XCircle className="w-4 h-4" /> Reject 25% Advance
+                        </button>
+                      </>
+                    ) : isMarketplacePending ? (
+                      <>
+                        <button
+                          disabled={isProcessingAction === order.id}
+                          onClick={() => handleApprove(order.id, "advance")}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-stone-950 text-xs font-black transition-all shadow-[0_0_15px_rgba(34,197,94,0.4)] disabled:opacity-50 cursor-pointer"
+                        >
+                          <Check className="w-4 h-4" /> Approve 100% Payment & Unlock Files
+                        </button>
+                        <button
+                          disabled={isProcessingAction === order.id}
+                          onClick={() => handleReject(order.id, "advance")}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold hover:bg-red-500/30 transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          <XCircle className="w-4 h-4" /> Reject Payment
+                        </button>
+                      </>
+                    ) : (
                       <>
                         <button
                           onClick={() => generateInvoice(order)}
@@ -442,15 +746,17 @@ export default function AdminPaymentsPage() {
                         >
                           <Receipt className="w-4 h-4" /> Download Invoice
                         </button>
-                        <span className="text-green-400 text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20">
-                          <CheckCircle className="w-4 h-4" /> Delivered
-                        </span>
+                        {order.status === "approved" && (
+                          <span className="text-emerald-400 text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                            <CheckCircle className="w-4 h-4" /> Verified & Approved
+                          </span>
+                        )}
+                        {order.status === "rejected" && (
+                          <span className="text-red-400 text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                            <XCircle className="w-4 h-4" /> Rejected
+                          </span>
+                        )}
                       </>
-                    )}
-                    {order.status === "rejected" && (
-                      <span className="text-red-400 text-xs font-bold flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
-                        <XCircle className="w-4 h-4" /> Rejected
-                      </span>
                     )}
                   </div>
                 </motion.div>
@@ -468,35 +774,60 @@ export default function AdminPaymentsPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-hidden"
-            onClick={() => { setPreviewImage(null); setIsZoomed(false); setImageError(false); }}
+            onClick={() => {
+              setPreviewImage(null);
+              setIsZoomed(false);
+              setImageError(false);
+            }}
           >
             <motion.div
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
-              className={`relative w-full rounded-2xl border border-white/10 bg-[#0a0a1a] flex flex-col transition-all duration-300 ${isZoomed ? 'max-w-[95vw]' : 'max-w-2xl'}`}
-              style={{ maxHeight: '95vh' }}
-              onClick={e => e.stopPropagation()}
+              className={`relative w-full rounded-2xl border border-white/10 bg-[#0a0a1a] flex flex-col transition-all duration-300 ${
+                isZoomed ? "max-w-[95vw]" : "max-w-2xl"
+              }`}
+              style={{ maxHeight: "95vh" }}
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="p-4 border-b border-white/10 flex items-center justify-between flex-shrink-0 bg-[#0a0a1a] rounded-t-2xl z-10 sticky top-0">
-                <h3 className="text-white font-bold">Payment Proof</h3>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setIsZoomed(!isZoomed)} className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <div className="min-w-0 flex-1 pr-3">
+                  <h3 className="text-white font-bold truncate text-sm sm:text-base">{previewTitle}</h3>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setIsZoomed(!isZoomed)}
+                    className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
+                  >
                     {isZoomed ? "Zoom Out" : "Zoom In"}
                   </button>
-                  <button onClick={() => {
-                    if (previewImage && previewImage !== "/loading") {
-                      window.open(previewImage, "_blank");
-                    }
-                  }} className="text-gray-400 hover:text-[var(--color-neon-blue)] p-1.5 rounded-lg hover:bg-[var(--color-neon-blue)]/10 transition-colors text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 border border-transparent hover:border-[var(--color-neon-blue)]/30">
+                  <button
+                    onClick={() => {
+                      if (previewImage && previewImage !== "/loading") {
+                        window.open(previewImage, "_blank");
+                      }
+                    }}
+                    className="text-gray-400 hover:text-[var(--color-neon-blue)] p-1.5 rounded-lg hover:bg-[var(--color-neon-blue)]/10 transition-colors text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 border border-transparent hover:border-[var(--color-neon-blue)]/30"
+                  >
                     Open Full
                   </button>
-                  <button onClick={() => { setPreviewImage(null); setIsZoomed(false); setImageError(false); }} className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors ml-2">
+                  <button
+                    onClick={() => {
+                      setPreviewImage(null);
+                      setIsZoomed(false);
+                      setImageError(false);
+                    }}
+                    className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors ml-2"
+                  >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
-              <div className={`p-4 overflow-auto custom-scrollbar flex-1 min-h-0 bg-transparent flex justify-center ${isZoomed ? 'items-start' : 'items-center'}`}>
+              <div
+                className={`p-4 overflow-auto custom-scrollbar flex-1 min-h-0 bg-transparent flex justify-center ${
+                  isZoomed ? "items-start" : "items-center"
+                }`}
+              >
                 {isLoadingImage || previewImage === "/loading" ? (
                   <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
                     <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
@@ -508,16 +839,20 @@ export default function AdminPaymentsPage() {
                       <ImageIcon className="w-6 h-6 text-amber-400" />
                     </div>
                     <p className="text-sm font-bold text-white">Payment Proof Unavailable</p>
-                    <p className="text-xs text-gray-400 max-w-sm text-center">Unable to load payment screenshot. Please verify payment using the customer UTR number.</p>
+                    <p className="text-xs text-gray-400 max-w-sm text-center">
+                      Unable to load payment screenshot. Please verify payment using the customer UTR number.
+                    </p>
                   </div>
                 ) : (
                   <img
                     src={previewImage || ""}
                     alt="Payment Screenshot"
                     onError={() => setImageError(true)}
-                    className={`w-full h-auto object-contain rounded-lg transition-transform duration-300 ${isZoomed ? 'max-h-none' : 'max-h-full'}`}
+                    className={`w-full h-auto object-contain rounded-lg transition-transform duration-300 ${
+                      isZoomed ? "max-h-none" : "max-h-full"
+                    }`}
                     onClick={() => setIsZoomed(!isZoomed)}
-                    style={{ cursor: isZoomed ? 'zoom-out' : 'zoom-in' }}
+                    style={{ cursor: isZoomed ? "zoom-out" : "zoom-in" }}
                   />
                 )}
               </div>

@@ -18,11 +18,7 @@ if (typeof window !== "undefined") {
       if (
         key &&
         (key.startsWith("firestore_") ||
-          key.startsWith("firestore-") ||
-          key.startsWith("edunova_comment_likes_") ||
-          key === "edunova_notifications" ||
-          key === "edunova_free_access" ||
-          key === "edunova_contact_messages")
+          key.startsWith("firestore-"))
       ) {
         keysToRemove.push(key);
       }

@@ -32,7 +32,9 @@ export type NotificationType =
   | "project_marketplace_added"
   | "custom_project_access_granted"
   | "referral_success"
-  | "contact_received";
+  | "contact_received"
+  | "discussion_received"
+  | "discussion_reply";
 
 export interface Notification {
   id: string;
@@ -47,11 +49,54 @@ export interface Notification {
 
 const NOTIF_STORAGE_KEY = "edunova_notifications";
 
+const SEED_ADMIN_NOTIFICATIONS: Notification[] = [
+  {
+    id: "ADMIN-NOTIF-INIT-1",
+    type: "payment_submitted",
+    title: "Payment Verification Required 💳",
+    message: "Customer uploaded payment screenshot for 'Predictive Maintenance Lite' (₹3,299). UTR: 489210492817. Needs verification.",
+    timestamp: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+    read: false,
+    userEmail: "admin",
+    metadata: { forAdmin: true, targetUrl: "/admin/orders", amount: 3299, projectTitle: "Predictive Maintenance Lite" },
+  },
+  {
+    id: "ADMIN-NOTIF-INIT-2",
+    type: "request_submitted",
+    title: "New Custom Project Request 📝",
+    message: "Student submitted custom build request for 'AI-Powered Smart Attendance System' (Budget: ₹4,500).",
+    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    read: false,
+    userEmail: "admin",
+    metadata: { forAdmin: true, targetUrl: "/admin/custom-requests", projectTitle: "AI-Powered Smart Attendance System" },
+  },
+  {
+    id: "ADMIN-NOTIF-INIT-3",
+    type: "contact_received",
+    title: "New Support Message ✉️",
+    message: "Message from college project team: 'Need customized hardware IoT sensor kit before final semester review.'",
+    timestamp: new Date(Date.now() - 1000 * 60 * 95).toISOString(),
+    read: false,
+    userEmail: "admin",
+    metadata: { forAdmin: true, targetUrl: "/admin/messages" },
+  },
+];
+
 function getNotifications(): Notification[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(NOTIF_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) {
+      // Initialize with seed notifications so admin bell has action items ready
+      localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(SEED_ADMIN_NOTIFICATIONS));
+      return SEED_ADMIN_NOTIFICATIONS;
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length === 0) {
+      localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(SEED_ADMIN_NOTIFICATIONS));
+      return SEED_ADMIN_NOTIFICATIONS;
+    }
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -61,6 +106,7 @@ function saveNotifications(notifications: Notification[]) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(notifications));
+    window.dispatchEvent(new CustomEvent("edunova_notifications_changed"));
   } catch (err) {
     console.warn("[Notifications] Could not save notifications to localStorage:", err);
   }
@@ -68,12 +114,12 @@ function saveNotifications(notifications: Notification[]) {
 
 const templates: Record<NotificationType, (data: any) => { title: string; message: string }> = {
   signup: (data) => ({
-    title: "Welcome to EduNova! 🎉",
-    message: `Hi ${data.userName}, your EduNova account has been created successfully. Browse our premium engineering projects and start building today!`,
+    title: "Welcome to EduNova Forge! 🎉",
+    message: `Hi ${data.userName}, your EduNova Forge account has been created successfully. Browse our premium engineering projects and start building today!`,
   }),
   login: (data) => ({
     title: "Login Successful ✅",
-    message: `Hi ${data.userName}, you've successfully logged into EduNova. If this wasn't you, please secure your account immediately.`,
+    message: `Hi ${data.userName}, you've successfully logged into EduNova Forge. If this wasn't you, please secure your account immediately.`,
   }),
   order_placed: (data) => ({
     title: "Order Placed Successfully 🛒",
@@ -169,11 +215,19 @@ const templates: Record<NotificationType, (data: any) => { title: string; messag
   }),
   project_marketplace_added: (data) => ({
     title: "Project Listed on Marketplace 🌟",
-    message: `"${data.projectTitle}" has been added to the EduNova marketplace and is now available for purchase by the community!`,
+    message: `"${data.projectTitle}" has been added to the EduNova Forge marketplace and is now available for purchase by the community!`,
   }),
   custom_project_access_granted: (data) => ({
     title: "Free Access Granted 🎁",
     message: `You have been granted free access to "${data.projectTitle}" on the marketplace — this was built from your custom request!`,
+  }),
+  discussion_received: (data) => ({
+    title: "New Discussion Comment 💬",
+    message: `${data.userName || "A user"} commented on "${data.projectTitle || "Project"}": "${(data.text || "").slice(0, 80)}"`,
+  }),
+  discussion_reply: (data) => ({
+    title: "EduNova Team Replied to Your Discussion 💬",
+    message: `Admin replied in "${data.projectTitle || "Project"}": "${(data.text || "").slice(0, 80)}"`,
   }),
   contact_received: (data) => ({
     title: "Message Received ✉️",
@@ -182,6 +236,50 @@ const templates: Record<NotificationType, (data: any) => { title: string; messag
   referral_success: (data) => ({
     title: "Referral Reward Unlocked! 🎁",
     message: `Congratulations! Your referral for ${data.referredName} has been verified. A discount of ₹${data.rewardAmount?.toLocaleString("en-IN")} has been applied to your remaining payment!`,
+  }),
+};
+
+// Admin notifications templates
+const adminTemplates: Partial<Record<NotificationType, (data: any) => { title: string; message: string; targetUrl: string }>> = {
+  order_placed: (data) => ({
+    title: "New Order Placed 🛒",
+    message: `${data.userName || "Customer"} placed order ${data.orderId || ""} for "${data.projectTitle}" (₹${data.amount?.toLocaleString("en-IN") || ""}).`,
+    targetUrl: "/admin/orders",
+  }),
+  payment_submitted: (data) => ({
+    title: "Payment Proof Submitted 💳",
+    message: `${data.userName || "Customer"} uploaded payment screenshot for order ${data.orderId || ""}. UTR: ${data.utrNumber || "N/A"}. Needs verification.`,
+    targetUrl: "/admin/payments",
+  }),
+  request_submitted: (data) => ({
+    title: "New Custom Request 📝",
+    message: `${data.userName || "Student"} submitted custom build request for "${data.projectTitle}".`,
+    targetUrl: "/admin/custom-requests",
+  }),
+  counter_offered: (data) => ({
+    title: "Counter Offer Received 🔄",
+    message: `${data.userName || "Student"} submitted a counter-offer on "${data.projectTitle}".`,
+    targetUrl: "/admin/custom-requests",
+  }),
+  discussion_received: (data) => ({
+    title: "New Discussion Comment 💬",
+    message: `${data.userName || "Customer"} commented on "${data.projectTitle || "Project"}": "${(data.text || "").slice(0, 80)}"`,
+    targetUrl: "/admin/discussions",
+  }),
+  contact_received: (data) => ({
+    title: "New Contact Message ✉️",
+    message: `Message from ${data.userName || "User"} (${data.userEmail}): "${data.subject || data.message?.slice(0, 40) || "Inquiry"}..."`,
+    targetUrl: "/admin/messages",
+  }),
+  signup: (data) => ({
+    title: "New User Registered 👤",
+    message: `${data.userName || "New user"} (${data.userEmail}) joined EduNova Forge.`,
+    targetUrl: "/admin/users",
+  }),
+  awaiting_final_approval: (data) => ({
+    title: "Build Completion Ready 🚀",
+    message: `${data.userName || "Customer"} confirmed build review for "${data.projectTitle}". Ready for final admin delivery approval.`,
+    targetUrl: "/admin/orders",
   }),
 };
 
@@ -210,10 +308,24 @@ export function sendNotification(
     metadata: data,
   };
   notifications.push(notification);
-  saveNotifications(notifications);
 
-  // In production: send real email via API
-  // await fetch('/api/send-email', { method: 'POST', body: JSON.stringify({ to: data.userEmail, subject: template.title, html: generateEmailHTML(template) }) });
+  // If this is an event the admin needs to know about, also create an admin notification
+  if (adminTemplates[type]) {
+    const adminTpl = adminTemplates[type]!(data);
+    const adminNotification: Notification = {
+      id: `ADMIN-NOTIF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+      type,
+      title: adminTpl.title,
+      message: adminTpl.message,
+      timestamp: new Date().toISOString(),
+      read: false,
+      userEmail: "admin",
+      metadata: { ...data, forAdmin: true, targetUrl: adminTpl.targetUrl },
+    };
+    notifications.push(adminNotification);
+  }
+
+  saveNotifications(notifications);
 
   logger.log(`[EduNova Notification] Notification created: ${template.title}`);
   return notification;
@@ -225,9 +337,58 @@ export function getUserNotifications(userEmail: string): Notification[] {
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 }
 
+export function getAdminNotifications(): Notification[] {
+  const all = getNotifications();
+  const adminEvents: NotificationType[] = [
+    "order_placed",
+    "payment_submitted",
+    "payment_pending",
+    "request_submitted",
+    "counter_offered",
+    "contact_received",
+    "signup",
+    "awaiting_final_approval",
+  ];
+
+  const adminList: Notification[] = [];
+  const seenIds = new Set<string>();
+
+  for (const n of all) {
+    if (n.userEmail === "admin" || n.metadata?.forAdmin === true) {
+      if (!seenIds.has(n.id)) {
+        seenIds.add(n.id);
+        adminList.push(n);
+      }
+    } else if (adminEvents.includes(n.type)) {
+      const copyId = `admin-mirror-${n.id}`;
+      if (!seenIds.has(copyId)) {
+        seenIds.add(copyId);
+        const adminTpl = adminTemplates[n.type]?.(n.metadata || {});
+        adminList.push({
+          id: copyId,
+          type: n.type,
+          title: adminTpl?.title || n.title,
+          message: adminTpl?.message || n.message,
+          timestamp: n.timestamp,
+          read: n.read,
+          userEmail: "admin",
+          metadata: {
+            ...n.metadata,
+            forAdmin: true,
+            targetUrl: adminTpl?.targetUrl || (n.metadata as any)?.targetUrl || "/admin",
+          },
+        });
+      }
+    }
+  }
+
+  return adminList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+}
+
 export function markNotificationRead(notifId: string): void {
   const notifications = getNotifications();
-  const idx = notifications.findIndex(n => n.id === notifId);
+  const cleanId = notifId.replace(/^admin-mirror-/, "");
+  const idx = notifications.findIndex(n => n.id === notifId || n.id === cleanId);
   if (idx !== -1) {
     notifications[idx].read = true;
     saveNotifications(notifications);
@@ -242,10 +403,72 @@ export function markAllRead(userEmail: string): void {
   saveNotifications(notifications);
 }
 
+export function markAllAdminRead(): void {
+  const notifications = getNotifications();
+  const adminEvents: NotificationType[] = [
+    "order_placed",
+    "payment_submitted",
+    "payment_pending",
+    "request_submitted",
+    "counter_offered",
+    "contact_received",
+    "signup",
+    "awaiting_final_approval",
+  ];
+  notifications.forEach(n => {
+    if (n.userEmail === "admin" || n.metadata?.forAdmin === true || adminEvents.includes(n.type)) {
+      n.read = true;
+    }
+  });
+  saveNotifications(notifications);
+}
+
 export function getUnreadCount(userEmail: string): number {
   return getNotifications().filter(n => n.userEmail === userEmail && !n.read).length;
 }
 
+export function getAdminUnreadCount(): number {
+  return getAdminNotifications().filter(n => !n.read).length;
+}
+
 export function getAllNotifications(): Notification[] {
   return getNotifications().sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+}
+
+export function clearNotification(notifId: string): void {
+  const notifications = getNotifications();
+  const cleanId = notifId.replace(/^admin-mirror-/, "").replace(/^admin-/, "").replace(/^user-/, "");
+  const filtered = notifications.filter(n => n.id !== notifId && n.id !== cleanId);
+  saveNotifications(filtered);
+}
+
+export function clearAllNotifications(userEmail?: string): void {
+  if (!userEmail) {
+    saveNotifications([]);
+    return;
+  }
+  const notifications = getNotifications();
+  const filtered = notifications.filter(n => n.userEmail !== userEmail);
+  saveNotifications(filtered);
+}
+
+export function clearAllAdminNotifications(): void {
+  const notifications = getNotifications();
+  const adminEvents: NotificationType[] = [
+    "order_placed",
+    "payment_submitted",
+    "payment_pending",
+    "request_submitted",
+    "counter_offered",
+    "contact_received",
+    "signup",
+    "awaiting_final_approval",
+    "discussion_received",
+  ];
+  const filtered = notifications.filter(n => {
+    if (n.userEmail === "admin" || n.metadata?.forAdmin === true) return false;
+    if (adminEvents.includes(n.type)) return false;
+    return true;
+  });
+  saveNotifications(filtered);
 }

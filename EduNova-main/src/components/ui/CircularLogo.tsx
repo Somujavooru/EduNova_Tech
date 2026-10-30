@@ -82,11 +82,11 @@ export function CircularLogo({ className = "w-[60px] h-[60px]" }: CircularLogoPr
       </svg>
 
       {/* Logo image */}
-      <div className="rounded-full overflow-hidden relative bg-stone-950 z-10 w-full h-full flex items-start justify-center">
+      <div className="rounded-full overflow-hidden relative bg-[#0a0e1a] z-10 w-full h-full flex items-center justify-center p-1">
         <img
-          src="/logo.jpg"
-          alt="EduNova Logo"
-          className="h-[150%] w-auto max-w-none object-cover object-top -mt-[8%]"
+          src="/ef-logo.png"
+          alt="EduNova Forge Logo"
+          className="w-full h-full object-contain"
         />
       </div>
     </div>

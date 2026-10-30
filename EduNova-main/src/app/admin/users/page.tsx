@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, where } from "firebase/firestore";
+import { useAuth, User } from "@/context/AuthContext";
+import { db, auth } from "@/lib/firebase";
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, where, onSnapshot } from "firebase/firestore";
 import { getAllUsers } from "@/lib/data/mockUsers";
 import { Order } from "@/lib/data/orders";
+import { sendNotification } from "@/lib/notifications";
+import { copyToClipboard as safeCopy } from "@/lib/clipboard";
 import {
   Search, Users, ShieldBan, ShieldCheck, Trash2,
   Mail, Calendar, ShoppingCart, ShieldAlert, Crown,
   X, Copy, Check, Phone, Eye, Gift, Sparkles, Clock,
-  Hash, Shield, CheckCircle, XCircle, Pencil
+  Hash, Shield, CheckCircle, XCircle, Pencil,
+  MessageSquare, Send, MessageCircle, ExternalLink, CheckCheck, Loader2
 } from "lucide-react";
 
 interface AdminUser extends User {
@@ -77,6 +80,7 @@ export default function AdminUsersPage() {
 
   // User detail modal state
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [modalTab, setModalTab] = useState<"profile" | "discussion">("profile");
   const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -84,39 +88,138 @@ export default function AdminUsersPage() {
   const [phoneInput, setPhoneInput] = useState("");
   const [isSavingPhone, setIsSavingPhone] = useState(false);
 
+  // Discussion & Chat state
+  const [discussionMessages, setDiscussionMessages] = useState<any[]>([]);
+  const [discussionLoading, setDiscussionLoading] = useState(false);
+  const [discussionText, setDiscussionText] = useState("");
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [discussionSentSuccess, setDiscussionSentSuccess] = useState(false);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  const loadUserDiscussions = async (email: string) => {
+    setDiscussionLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`/api/admin/users/discussion?email=${encodeURIComponent(email)}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDiscussionMessages(data.messages || []);
+      }
+    } catch (err) {
+      console.warn("Notice loading user discussions:", err);
+    } finally {
+      setDiscussionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedUser?.email) {
+      loadUserDiscussions(selectedUser.email);
+    } else {
+      setDiscussionMessages([]);
+      setModalTab("profile");
+    }
+  }, [selectedUser?.email]);
+
+  useEffect(() => {
+    if (modalTab === "discussion") {
+      setTimeout(() => {
+        chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
+  }, [modalTab, discussionMessages]);
+
+  const handleSendDiscussion = async (customMessage?: string) => {
+    const textToSend = customMessage || discussionText;
+    if (!textToSend.trim() || !selectedUser) return;
+
+    setIsSendingMessage(true);
+    setDiscussionSentSuccess(false);
+
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/admin/users/discussion", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          email: selectedUser.email,
+          name: selectedUser.name || "User",
+          message: textToSend.trim(),
+          subject: "Discussion with Admin",
+          phone: selectedUser.phoneNumber || selectedUser.phone || "",
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.message) {
+          setDiscussionMessages(prev => {
+            const idx = prev.findIndex(m => m.id === data.message.id);
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = data.message;
+              return copy;
+            }
+            return [...prev, data.message];
+          });
+        }
+        
+        sendNotification("contact_received", {
+          userEmail: selectedUser.email,
+          userName: selectedUser.name,
+          title: `Direct Message from Admin (${currentUser?.name || "EduNova Team"})`,
+          message: textToSend.trim(),
+        });
+
+        if (!customMessage) setDiscussionText("");
+        setDiscussionSentSuccess(true);
+        setTimeout(() => setDiscussionSentSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error("Failed to send discussion message:", err);
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
       const snap = await getDocs(collection(db, "users"));
-      // Auto-purge any non-admin / test users directly
-      const nonAdminDocs = snap.docs.filter(doc => {
-        const data = doc.data();
-        const email = (data.email || "").toLowerCase().trim();
-        const isAdmin = data.role === "admin" || data.role === "owner" || [
-          "somashekharjavooru@gmail.com",
-          "vijayrk0513@gmail.com",
-          "admin@edunova.com",
-          "somashekhar@edunova.com",
-          "vijay@edunova.com"
-        ].includes(email);
-        return !isAdmin;
-      });
-      if (nonAdminDocs.length > 0) {
-        await Promise.all(nonAdminDocs.map(d => deleteDoc(d.ref)));
-      }
-
-      const updatedSnap = await getDocs(collection(db, "users"));
-      const userList = updatedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AdminUser));
+      const userList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AdminUser));
       setUsers(userList);
     } catch (err: any) {
       console.warn("[Admin Users] Firestore fetch notice:", err?.code || err?.message);
-      setUsers([]);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
-    fetchUsers();
+    setIsLoading(true);
+    // Real-time listener: immediately updates the admin list when any new user registers or updates
+    const unsub = onSnapshot(
+      collection(db, "users"),
+      (snap) => {
+        const userList = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as AdminUser));
+        setUsers(userList);
+        setIsLoading(false);
+      },
+      (err) => {
+        console.warn("[Admin Users] Realtime snapshot notice:", err?.code || err?.message);
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsub();
   }, []);
 
   // Fetch orders and init phone input when a user is selected
@@ -172,9 +275,9 @@ export default function AdminUsersPage() {
     }
   };
 
-  const copyToClipboard = (text: string, field: string) => {
+  const copyToClipboard = async (text: string, field: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
+    await safeCopy(text);
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 2000);
   };
@@ -510,16 +613,238 @@ export default function AdminUsersPage() {
                   </div>
                 </div>
 
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setModalTab(modalTab === "profile" ? "discussion" : "profile")}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                      modalTab === "discussion"
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                        : "bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/10"
+                    }`}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{modalTab === "discussion" ? "View Profile" : "Chat & Discussion"}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedUser(null)}
+                    className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Tabs Bar */}
+              <div className="flex items-center border-b border-white/10 px-6 bg-white/[0.01]">
                 <button
-                  onClick={() => setSelectedUser(null)}
-                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 transition-colors"
+                  onClick={() => setModalTab("profile")}
+                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+                    modalTab === "profile"
+                      ? "border-[#00d4ff] text-[#00d4ff] bg-[#00d4ff]/5"
+                      : "border-transparent text-gray-400 hover:text-white"
+                  }`}
                 >
-                  <X className="w-5 h-5" />
+                  <Users className="w-3.5 h-3.5" />
+                  Account & Orders
+                </button>
+                <button
+                  onClick={() => setModalTab("discussion")}
+                  className={`py-3 px-4 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+                    modalTab === "discussion"
+                      ? "border-amber-400 text-amber-400 bg-amber-400/5"
+                      : "border-transparent text-gray-400 hover:text-white"
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  Chat & Discussion
+                  {discussionMessages.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
+                      {discussionMessages.reduce((acc, m) => acc + 1 + (m.replies?.length || 0), 0)}
+                    </span>
+                  )}
                 </button>
               </div>
 
               {/* Modal Content - Scrollable */}
-              <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+              <div className="p-6 overflow-y-auto custom-scrollbar space-y-6 flex-1">
+                {modalTab === "discussion" ? (
+                  /* ── TAB 2: CHAT & DISCUSSION WITH USER ── */
+                  <div className="space-y-5">
+                    {/* Fast External Channels */}
+                    <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold text-white flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          Direct Contact Channels
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          Reach {selectedUser.name || "the user"} via in-app discussion, WhatsApp, or registered email.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {(() => {
+                          const rawPhone = selectedUser.phoneNumber || selectedUser.phone || selectedUser.mobile || "";
+                          const cleanDigits = rawPhone.replace(/\D/g, "");
+                          const waNumber = cleanDigits.length === 10 ? `91${cleanDigits}` : cleanDigits;
+                          if (cleanDigits) {
+                            return (
+                              <a
+                                href={`https://wa.me/${waNumber}?text=${encodeURIComponent(`Hi ${selectedUser.name || ""}, this is EduNova Support Team...`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition-all shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>WhatsApp ({rawPhone})</span>
+                                <ExternalLink className="w-3 h-3 text-emerald-400/70" />
+                              </a>
+                            );
+                          }
+                          return null;
+                        })()}
+
+                        <a
+                          href={`mailto:${selectedUser.email}?subject=${encodeURIComponent("EduNova Support - Discussion with Admin")}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-blue-300 text-xs font-semibold transition-all"
+                        >
+                          <Mail className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Send Email</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Chat Messages Feed */}
+                    <div className="rounded-2xl border border-white/10 bg-[#070712] p-4 min-h-[280px] max-h-[380px] overflow-y-auto custom-scrollbar flex flex-col gap-3">
+                      {discussionLoading ? (
+                        <div className="flex-1 flex flex-col items-center justify-center py-12 text-gray-500 gap-2">
+                          <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+                          <p className="text-xs">Loading conversation history...</p>
+                        </div>
+                      ) : discussionMessages.length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-500">
+                          <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center mb-3">
+                            <MessageSquare className="w-6 h-6 text-gray-400" />
+                          </div>
+                          <p className="text-xs font-semibold text-gray-300">No prior discussion with {selectedUser.name}</p>
+                          <p className="text-[11px] text-gray-500 max-w-xs mt-1">
+                            Send a message below. It will be delivered directly to their dashboard and trigger an instant in-app notification.
+                          </p>
+                        </div>
+                      ) : (
+                        discussionMessages.map((msg: any) => {
+                          const allReplies = Array.isArray(msg.replies) ? msg.replies : [];
+                          return (
+                            <div key={msg.id} className="space-y-2.5">
+                              {/* Initial Inquiry / Message */}
+                              <div className="flex gap-2.5 items-start">
+                                <div className="w-7 h-7 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-xs font-bold text-cyan-300 flex-shrink-0">
+                                  {msg.name?.charAt(0) || "U"}
+                                </div>
+                                <div className="max-w-[85%] rounded-2xl bg-white/[0.04] border border-white/10 p-3 text-xs">
+                                  <div className="flex items-center justify-between gap-3 mb-1">
+                                    <span className="font-semibold text-cyan-300">{msg.name || "User"}</span>
+                                    <span className="text-[10px] text-gray-500">{formatDateTime(msg.createdAt)}</span>
+                                  </div>
+                                  <p className="text-gray-200 leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                                </div>
+                              </div>
+
+                              {/* All Admin Replies for this thread */}
+                              {allReplies.map((r: any, rIdx: number) => (
+                                <div key={r.id || rIdx} className="flex gap-2.5 items-start justify-end">
+                                  <div className="max-w-[85%] rounded-2xl bg-gradient-to-r from-amber-500/15 via-purple-500/15 to-purple-600/15 border border-amber-500/30 p-3 text-xs shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                                    <div className="flex items-center justify-between gap-3 mb-1">
+                                      <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                                        <Crown className="w-3 h-3 text-amber-400" />
+                                        {r.repliedBy || "EduNova Support Admin"}
+                                      </span>
+                                      <span className="text-[10px] text-gray-400">{formatDateTime(r.repliedAt)}</span>
+                                    </div>
+                                    <p className="text-white leading-relaxed whitespace-pre-wrap">{r.text}</p>
+                                  </div>
+                                  <div className="w-7 h-7 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xs font-bold text-amber-300 flex-shrink-0">
+                                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })
+                      )}
+                      <div ref={chatBottomRef} />
+                    </div>
+
+                    {/* Quick Response Templates */}
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Quick Discussion Prompts:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          "👋 Hi! How can we assist with your project order?",
+                          "💳 Please verify your UTR number and payment screenshot.",
+                          "🚀 Great news! Your custom project build is ready for download.",
+                          "🎁 We've applied a referral discount to your account!"
+                        ].map((prompt, pIdx) => (
+                          <button
+                            key={pIdx}
+                            onClick={() => setDiscussionText(prompt)}
+                            className="px-2.5 py-1 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-[11px] text-gray-300 hover:text-white transition-colors"
+                          >
+                            {prompt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Message Input Box */}
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
+                      <textarea
+                        value={discussionText}
+                        onChange={(e) => setDiscussionText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendDiscussion();
+                          }
+                        }}
+                        placeholder={`Write a message to ${selectedUser.name || "user"}... (Press Enter to send, Shift+Enter for new line)`}
+                        rows={3}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-400 resize-none transition-colors"
+                      />
+
+                      <div className="flex items-center justify-between">
+                        {discussionSentSuccess ? (
+                          <span className="text-xs text-green-400 flex items-center gap-1 font-semibold animate-pulse">
+                            <CheckCheck className="w-3.5 h-3.5" /> Sent & notified in real time!
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-gray-500">
+                            Dispatched with in-app push notification
+                          </span>
+                        )}
+
+                        <button
+                          onClick={() => handleSendDiscussion()}
+                          disabled={isSendingMessage || !discussionText.trim()}
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-stone-950 font-bold text-xs flex items-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.25)] transition-all"
+                        >
+                          {isSendingMessage ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-3.5 h-3.5" /> Send Message
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── TAB 1: USER PROFILE & ORDERS (EXISTING CONTENT) ── */
+                  <>
                 
                 {/* Section 1: Overview Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -703,6 +1028,8 @@ export default function AdminUsersPage() {
                     </div>
                   )}
                 </div>
+                  </>
+                )}
 
               </div>
 
@@ -754,6 +1081,15 @@ export default function AdminUsersPage() {
                       </button>
                     </>
                   )}
+
+                  {/* Toggle Discussion Tab Button */}
+                  <button
+                    onClick={() => setModalTab(modalTab === "profile" ? "discussion" : "profile")}
+                    className="px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+                    {modalTab === "profile" ? "Chat & Discussion" : "View Profile"}
+                  </button>
                 </div>
 
                 <button

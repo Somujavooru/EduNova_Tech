@@ -7,7 +7,7 @@ import {
   getCommentsByProject, submitComment, deleteComment,
   toggleLikeComment, pinComment, toggleSolution, Comment as CommentType
 } from "@/lib/data/reviews";
-import { Heart, Reply, Trash2, Pin, Send, MessageCircle, CheckCircle, ShieldAlert } from "lucide-react";
+import { Heart, Reply, Trash2, Pin, Send, MessageCircle, CheckCircle, ShieldAlert, Loader2 } from "lucide-react";
 import { Button } from "./Button";
 
 interface CommentSectionProps {
@@ -20,6 +20,8 @@ export function CommentSection({ projectId }: CommentSectionProps) {
   const [text, setText] = useState("");
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const refresh = async () => {
     const list = await getCommentsByProject(projectId);
@@ -39,7 +41,20 @@ export function CommentSection({ projectId }: CommentSectionProps) {
     setComments(list);
   };
 
-  useEffect(() => { refresh(); }, [projectId, user?.id]);
+  useEffect(() => {
+    refresh();
+
+    window.addEventListener("edunova_reviews_updated", refresh);
+    window.addEventListener("storage", refresh);
+
+    const timer = setInterval(refresh, 3500);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("edunova_reviews_updated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [projectId, user?.id]);
 
   const topLevel = comments.filter(c => !c.parentId);
   const getReplies = (parentId: string) => comments.filter(c => c.parentId === parentId)
@@ -48,18 +63,53 @@ export function CommentSection({ projectId }: CommentSectionProps) {
   const isAdmin = user?.role === "admin";
 
   const handleSubmit = async () => {
-    if (!user || !text.trim()) return;
-    await submitComment({ projectId, userId: user.id, userName: user.name, text: text.trim(), parentId: null, isAdminReply: isAdmin });
-    setText("");
-    refresh();
+    if (!user || !text.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const created = await submitComment({
+        projectId,
+        userId: user.id,
+        userName: user.name || "Member",
+        text: text.trim(),
+        parentId: null,
+        isAdminReply: isAdmin,
+      });
+      if (created) {
+        setText("");
+        setComments((prev) => [created, ...prev.filter((c) => c.id !== created.id)]);
+      } else {
+        setSubmitError("Could not post comment. Please try again.");
+      }
+    } catch (err: any) {
+      setSubmitError(err?.message || "Failed to post comment.");
+    } finally {
+      setIsSubmitting(false);
+      refresh();
+    }
   };
 
   const handleReply = async (parentId: string) => {
-    if (!user || !replyText.trim()) return;
-    await submitComment({ projectId, userId: user.id, userName: user.name, text: replyText.trim(), parentId, isAdminReply: isAdmin });
-    setReplyText("");
-    setReplyTo(null);
-    refresh();
+    if (!user || !replyText.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const created = await submitComment({
+        projectId,
+        userId: user.id,
+        userName: user.name || "Member",
+        text: replyText.trim(),
+        parentId,
+        isAdminReply: isAdmin,
+      });
+      if (created) {
+        setReplyText("");
+        setReplyTo(null);
+        setComments((prev) => [...prev.filter((c) => c.id !== created.id), created]);
+      }
+    } finally {
+      setIsSubmitting(false);
+      refresh();
+    }
   };
 
   const handleDelete = async (id: string) => { await deleteComment(id); refresh(); };
@@ -247,18 +297,24 @@ export function CommentSection({ projectId }: CommentSectionProps) {
 
       {/* Post new comment */}
       {user ? (
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Join the discussion..."
-            value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleSubmit()}
-            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--color-neon-blue)]"
-          />
-          <Button onClick={handleSubmit} disabled={!text.trim()}>
-            <Send className="w-4 h-4" />
-          </Button>
+        <div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Join the discussion..."
+              value={text}
+              onChange={e => setText(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && !isSubmitting && handleSubmit()}
+              disabled={isSubmitting}
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--color-neon-blue)] disabled:opacity-50"
+            />
+            <Button onClick={handleSubmit} disabled={!text.trim() || isSubmitting}>
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </Button>
+          </div>
+          {submitError && (
+            <p className="text-red-400 text-xs mt-1.5">{submitError}</p>
+          )}
         </div>
       ) : (
         <p className="text-gray-500 text-xs text-center py-3 bg-white/5 border border-white/10 rounded-lg">

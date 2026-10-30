@@ -31,6 +31,13 @@ export interface Order {
   projectCategory: string;
   sellerName: string;
   amount: number;
+  totalProjectPrice?: number;
+  advanceAmount?: number;
+  balanceAmount?: number;
+  paymentVerificationStatus?: "pending" | "approved" | "rejected";
+  rejectionReason?: string | null;
+  verifiedBy?: string | null;
+  verifiedAt?: string | null;
   utrNumber: string;
   paymentMethod: string;
   /** Firebase Storage download URL or compressed base64 data URL */
@@ -47,6 +54,16 @@ export interface Order {
   buildStage?: "planning" | "building" | "testing" | "completed" | "delivered";
   driveUrl?: string;
   demoVideoUrl?: string;
+  finalUtrNumber?: string;
+  finalPayment?: {
+    amount: number;
+    utrNumber: string;
+    screenshot: string;
+    status: "pending" | "approved" | "rejected";
+    discountApplied?: number;
+    submittedAt: string;
+    verifiedAt?: string;
+  };
 }
 
 /**
@@ -57,6 +74,15 @@ export class DuplicateUtrError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "DuplicateUtrError";
+  }
+}
+
+export function notifyOrdersSync() {
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent("edunova_orders_updated"));
+      localStorage.setItem("edunova_orders_sync_time", Date.now().toString());
+    } catch {}
   }
 }
 
@@ -177,6 +203,7 @@ export async function createOrder(
     throw new Error("Invalid response received from server. Please retry.");
   }
 
+  notifyOrdersSync();
   return data.order as Order;
 }
 
@@ -210,7 +237,12 @@ export async function getAllOrders(): Promise<Order[]> {
   }
 }
 
-export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<Order | null> {
+export async function updateOrderStatus(
+  orderId: string,
+  status: OrderStatus,
+  rejectionReason?: string,
+  adminEmail?: string
+): Promise<Order | null> {
   const ref = doc(db, "orders", orderId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
@@ -218,13 +250,17 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
   const data = snap.data() as Order;
   const now = new Date().toISOString();
 
-  // Build a typed partial update — no `as any` cast needed
-  const updatePayload: Partial<Pick<Order, "status" | "updatedAt" | "deliveryStatus" | "deliveredAt" | "buildStage">> = {
+  // Build a typed partial update
+  const updatePayload: Partial<Order> = {
     status,
+    paymentVerificationStatus: status,
     updatedAt: now,
+    verifiedAt: now,
+    verifiedBy: adminEmail || "admin",
   };
 
   if (status === "approved") {
+    updatePayload.rejectionReason = null;
     if (data.orderType === "advance_payment") {
       updatePayload.deliveryStatus = "pending";
       updatePayload.buildStage = data.buildStage || "planning";
@@ -237,9 +273,11 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus): P
     }
   } else if (status === "rejected") {
     updatePayload.deliveryStatus = "failed";
+    updatePayload.rejectionReason = rejectionReason || "Payment verification failed. Please check your transaction details or contact support.";
   }
 
   await updateDoc(ref, updatePayload);
+  notifyOrdersSync();
 
   return {
     ...data,
@@ -269,6 +307,7 @@ export async function updateOrderBuildStage(
   };
 
   await updateDoc(ref, updatePayload);
+  notifyOrdersSync();
   return {
     ...data,
     ...updatePayload,
@@ -290,6 +329,7 @@ export async function updateOrderDeliveryStatus(orderId: string, deliveryStatus:
   };
 
   await updateDoc(ref, updatePayload);
+  notifyOrdersSync();
 
   return {
     ...data,
@@ -313,6 +353,7 @@ export async function deleteOrder(orderId: string): Promise<boolean> {
   try {
     if (!orderId) return false;
     await deleteDoc(doc(db, "orders", orderId));
+    notifyOrdersSync();
     return true;
   } catch (err) {
     console.error("Firebase Error deleting order:", err);
@@ -320,14 +361,74 @@ export async function deleteOrder(orderId: string): Promise<boolean> {
   }
 }
 
+export async function resubmitOrderPayment(
+  orderId: string,
+  utrNumber: string,
+  paymentScreenshot: string
+): Promise<Order | null> {
+  const ref = doc(db, "orders", orderId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return null;
+
+  const data = snap.data() as Order;
+  const now = new Date().toISOString();
+
+  const updatePayload: Partial<Order> = {
+    status: "pending",
+    paymentVerificationStatus: "pending",
+    rejectionReason: null,
+    utrNumber: utrNumber.trim(),
+    paymentScreenshot,
+    updatedAt: now,
+  };
+
+  await updateDoc(ref, updatePayload);
+
+  // If this order is linked to custom_request, sync advancePayment or finalPayment
+  if (data.customRequestId) {
+    try {
+      const customReqRef = doc(db, "custom_requests", data.customRequestId);
+      const customReqSnap = await getDoc(customReqRef);
+      if (customReqSnap.exists()) {
+        const customData = customReqSnap.data();
+        if (data.orderType === "advance_payment" && customData.advancePayment) {
+          await updateDoc(customReqRef, {
+            "advancePayment.status": "pending",
+            "advancePayment.utrNumber": utrNumber.trim(),
+            "advancePayment.screenshot": paymentScreenshot,
+            "advancePayment.resubmittedAt": now,
+          });
+        } else if (data.orderType === "final_payment" && customData.finalPayment) {
+          await updateDoc(customReqRef, {
+            "finalPayment.status": "pending",
+            "finalPayment.utrNumber": utrNumber.trim(),
+            "finalPayment.screenshot": paymentScreenshot,
+            "finalPayment.resubmittedAt": now,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[Orders] Could not sync resubmission to custom request:", e);
+    }
+  }
+
+  notifyOrdersSync();
+  return {
+    ...data,
+    ...updatePayload,
+  };
+}
+
 export async function clearAllOrders(): Promise<boolean> {
   try {
     const snap = await getDocs(collection(db, "orders"));
     const deletePromises = snap.docs.map(d => deleteDoc(d.ref));
     await Promise.all(deletePromises);
+    notifyOrdersSync();
     return true;
   } catch (err) {
     console.error("Firebase Error clearing all orders:", err);
     return false;
   }
 }
+

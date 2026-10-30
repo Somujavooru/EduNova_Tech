@@ -461,12 +461,19 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     let unsubOrders: (() => void) | null = null;
+    let unsubUsers: (() => void) | null = null;
 
-    import("firebase/firestore").then(async ({ collection, getDocs, deleteDoc, onSnapshot }) => {
+    import("firebase/firestore").then(async ({ collection, onSnapshot }) => {
       try {
         const { db } = await import("@/lib/firebase");
-        const snap = await getDocs(collection(db, "users"));
-        setUsersCount(snap.size);
+
+        // Real-time listener on users count
+        unsubUsers = onSnapshot(collection(db, "users"), (usersSnap) => {
+          setUsersCount(usersSnap.size);
+        }, (err) => {
+          console.warn("[Admin] Users snapshot notice:", err);
+          setUsersCount(getAllUsers().length);
+        });
 
         // Real-time listener on orders for admin revenue & metrics
         unsubOrders = onSnapshot(collection(db, "orders"), (ordersSnap) => {
@@ -487,8 +494,22 @@ export default function AdminDashboardPage() {
 
     getAllProjectsForAdmin().then(setProjects);
 
+    const handleSync = () => {
+      getAllOrders().then(setOrders).catch(() => {});
+    };
+    window.addEventListener("edunova_orders_updated", handleSync);
+    window.addEventListener("storage", handleSync);
+
+    const livePoll = setInterval(() => {
+      getAllOrders().then(setOrders).catch(() => {});
+    }, 3000);
+
     return () => {
       if (unsubOrders) unsubOrders();
+      if (unsubUsers) unsubUsers();
+      clearInterval(livePoll);
+      window.removeEventListener("edunova_orders_updated", handleSync);
+      window.removeEventListener("storage", handleSync);
     };
   }, [user]);
 
@@ -673,9 +694,9 @@ export default function AdminDashboardPage() {
     { text: "System security scan completed: All systems nominal", time: "1 hour ago", icon: TrendingUp, color: "#b026ff" },
   ];
 
-  const handleExportAll = () => downloadOrdersExcel(orders, `EduNova_All_Orders_${new Date().toISOString().split("T")[0]}.csv`);
-  const handleExportApproved = () => downloadOrdersExcel(orders.filter(o => o.status === "approved"), `EduNova_Approved_Orders.csv`);
-  const handleExportPending = () => downloadOrdersExcel(orders.filter(o => o.status === "pending"), `EduNova_Pending_Orders.csv`);
+  const handleExportAll = () => downloadOrdersExcel(orders, `EduNova_Forge_All_Orders_${new Date().toISOString().split("T")[0]}.csv`);
+  const handleExportApproved = () => downloadOrdersExcel(orders.filter(o => o.status === "approved"), `EduNova_Forge_Approved_Orders.csv`);
+  const handleExportPending = () => downloadOrdersExcel(orders.filter(o => o.status === "pending"), `EduNova_Forge_Pending_Orders.csv`);
 
   return (
     <div>

@@ -14,11 +14,12 @@ import {
 } from "@/lib/data/orders";
 import { updateCustomRequestFields } from "@/lib/data/customRequests";
 import { db, auth } from "@/lib/firebase";
-import { collection, onSnapshot, doc, getDoc, writeBatch } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { generateInvoice } from "@/lib/invoiceGenerator";
 import { downloadOrdersExcel } from "@/lib/exportOrders";
 import { sendNotification } from "@/lib/notifications";
 import { unlockUserReferralCode, unlockReferralReward } from "@/lib/data/referrals";
+import { copyToClipboard as safeCopy } from "@/lib/clipboard";
 import {
   ShoppingBag,
   Package,
@@ -185,6 +186,8 @@ export default function AdminOrdersPage() {
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
   const [adminToken, setAdminToken] = useState<string>("");
   const [imageError, setImageError] = useState(false);
+  const [rejectionModalOrder, setRejectionModalOrder] = useState<Order | null>(null);
+  const [rejectionReasonText, setRejectionReasonText] = useState("");
 
   useEffect(() => {
     const unsubAuth = auth.onAuthStateChanged(async (u) => {
@@ -200,38 +203,103 @@ export default function AdminOrdersPage() {
 
   // Live real-time listener on orders collection
   useEffect(() => {
-    const unsub = onSnapshot(
-      collection(db, "orders"),
-      (snap) => {
-        const orderList = snap.docs
-          .map((d) => ({ ...d.data(), id: d.id } as Order))
-          .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    let unsub = () => {};
+
+    const fetchOrders = async () => {
+      try {
+        const orderList = await getAllOrders();
         setOrders(orderList);
-      },
-      (err) => {
-        console.warn("[AdminOrders] Firestore orders listener notice:", err);
-      }
-    );
+        if (previewOrder) {
+          const fresh = orderList.find((o) => o.id === previewOrder.id);
+          if (fresh) setPreviewOrder(fresh);
+        }
+      } catch (e) {}
+    };
 
-    return () => unsub();
-  }, []);
+    fetchOrders();
 
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+    try {
+      unsub = onSnapshot(
+        collection(db, "orders"),
+        (snap) => {
+          const orderList = snap.docs
+            .map((d) => ({ ...d.data(), id: d.id } as Order))
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          setOrders(orderList);
+          if (previewOrder) {
+            const fresh = orderList.find((o) => o.id === previewOrder.id);
+            if (fresh) setPreviewOrder(fresh);
+          }
+        },
+        (err) => {
+          console.warn("[AdminOrders] Firestore orders listener notice (using polling):", err?.message);
+        }
+      );
+    } catch (e) {}
+
+    const handleSync = () => fetchOrders();
+    window.addEventListener("edunova_orders_updated", handleSync);
+    window.addEventListener("storage", handleSync);
+
+    const liveTimer = setInterval(fetchOrders, 3000);
+
+    return () => {
+      unsub();
+      clearInterval(liveTimer);
+      window.removeEventListener("edunova_orders_updated", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
+  }, [previewOrder?.id]);
+
+  const copyToClipboard = async (text: string, id: string) => {
+    if (!text) return;
+    await safeCopy(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
   const handleApprove = async (order: Order) => {
     setIsActionLoading(order.id);
+    const adminEmail = auth.currentUser?.email || "somashekharjavooru@gmail.com";
     try {
-      const updated = await updateOrderStatus(order.id, "approved");
+      const updated = await updateOrderStatus(order.id, "approved", undefined, adminEmail);
+      const isFinalApproval = order.orderType === "final_payment" || order.finalPayment?.status === "pending";
       if (updated) {
-        if (order.orderType === "advance_payment" && order.customRequestId) {
+        if (isFinalApproval) {
+          await updateDoc(doc(db, "orders", order.id), {
+            "finalPayment.status": "approved",
+            "finalPayment.verifiedAt": new Date().toISOString(),
+            deliveryStatus: "delivered",
+            buildStage: "delivered",
+            deliveredAt: new Date().toISOString(),
+          });
+
+          if (order.customRequestId) {
+            await updateCustomRequestFields(order.customRequestId, {
+              status: "delivered",
+              finalPayment: {
+                amount: order.finalPayment?.amount || order.balanceAmount || order.amount,
+                status: "verified",
+                utrNumber: order.finalPayment?.utrNumber || order.utrNumber,
+                screenshot: order.finalPayment?.screenshot || order.paymentScreenshot,
+                verifiedAt: new Date().toISOString(),
+              },
+              trackingHistory: [
+                {
+                  stage: "delivered",
+                  label: "Project Delivered & Files Unlocked",
+                  progressPercent: 100,
+                  notes: "Final 75% payment verified. Google Drive links and project deliverables unlocked.",
+                  completedAt: new Date().toISOString(),
+                }
+              ]
+            });
+          }
+        } else if (order.orderType === "advance_payment" && order.customRequestId) {
           await updateCustomRequestFields(order.customRequestId, {
             status: "planning",
             advancePayment: {
-              amount: order.amount,
+              amount: order.advanceAmount || order.amount,
               status: "verified",
               utrNumber: order.utrNumber,
               screenshot: order.paymentScreenshot,
@@ -243,28 +311,6 @@ export default function AdminOrdersPage() {
                 label: "Project Planning & Architecture",
                 progressPercent: 25,
                 notes: "25% Advance payment verified. Architecture planning and development initialized.",
-                completedAt: new Date().toISOString(),
-              }
-            ]
-          });
-        }
-
-        if (order.orderType === "final_payment" && order.customRequestId) {
-          await updateCustomRequestFields(order.customRequestId, {
-            status: "delivered",
-            finalPayment: {
-              amount: order.amount,
-              status: "verified",
-              utrNumber: order.utrNumber,
-              screenshot: order.paymentScreenshot,
-              verifiedAt: new Date().toISOString(),
-            },
-            trackingHistory: [
-              {
-                stage: "delivered",
-                label: "Project Delivered & Files Unlocked",
-                progressPercent: 100,
-                notes: "Final 75% payment verified. Google Drive links and project deliverables unlocked.",
                 completedAt: new Date().toISOString(),
               }
             ]
@@ -322,14 +368,20 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const handleReject = async (order: Order) => {
-    if (!confirm(`Are you sure you want to reject order ${order.id}? The customer will be notified.`)) {
-      return;
-    }
+  const openRejectionModal = (order: Order) => {
+    setRejectionModalOrder(order);
+    setRejectionReasonText("Payment verification failed. Submitted UTR or payment screenshot could not be verified against bank records.");
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectionModalOrder) return;
+    const order = rejectionModalOrder;
+    const reason = rejectionReasonText.trim() || "Payment verification failed. Submitted UTR or payment proof could not be verified.";
+    const adminEmail = auth.currentUser?.email || "somashekharjavooru@gmail.com";
 
     setIsActionLoading(order.id);
     try {
-      const updated = await updateOrderStatus(order.id, "rejected");
+      const updated = await updateOrderStatus(order.id, "rejected", reason, adminEmail);
       if (updated) {
         if (order.orderType === "advance_payment" && order.customRequestId) {
           await updateCustomRequestFields(order.customRequestId, {
@@ -359,6 +411,7 @@ export default function AdminOrdersPage() {
           projectTitle: order.projectTitle,
         });
       }
+      setRejectionModalOrder(null);
     } catch (e) {
       console.error("Reject order error:", e);
       alert("Failed to reject order: " + ((e as Error)?.message || e));
@@ -425,13 +478,16 @@ export default function AdminOrdersPage() {
           const existingReq = await getCustomRequestById(order.customRequestId);
           const history = existingReq?.trackingHistory || [];
           const now = new Date().toISOString();
+          const is75Verified = existingReq?.finalPayment?.status === "verified";
 
           const filtered = history.filter((h) => h.stage !== stage);
           filtered.push({
             stage,
-            label: cfg.label,
+            label: stage === "delivered" && !is75Verified ? "Build Finished (Awaiting 75% Payment)" : cfg.label,
             progressPercent: cfg.progressPercent,
-            notes: cfg.notes,
+            notes: stage === "delivered" && !is75Verified 
+              ? "Project build is 100% complete! Files will unlock immediately upon user completing the 75% final payment."
+              : cfg.notes,
             completedAt: now,
           });
 
@@ -456,12 +512,28 @@ export default function AdminOrdersPage() {
           projectTitle: order.projectTitle,
         });
       } else if (stage === "delivered") {
-        sendNotification("download_unlocked", {
-          userEmail: order.userEmail,
-          userName: order.userName,
-          projectTitle: order.projectTitle,
-          orderId: order.id,
-        });
+        let is75Verified = false;
+        if (order.customRequestId) {
+          try {
+            const { getCustomRequestById } = await import("@/lib/data/customRequests");
+            const linkedReq = await getCustomRequestById(order.customRequestId);
+            is75Verified = linkedReq?.finalPayment?.status === "verified";
+          } catch {}
+        }
+        if (is75Verified) {
+          sendNotification("download_unlocked", {
+            userEmail: order.userEmail,
+            userName: order.userName,
+            projectTitle: order.projectTitle,
+            orderId: order.id,
+          });
+        } else {
+          sendNotification("project_completed", {
+            userEmail: order.userEmail,
+            userName: order.userName,
+            projectTitle: order.projectTitle,
+          });
+        }
       }
     } catch (e: any) {
       console.error("Error updating stage:", e);
@@ -549,7 +621,7 @@ export default function AdminOrdersPage() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => downloadOrdersExcel(orders, "EduNova_Project_Orders.xlsx")}
+            onClick={() => downloadOrdersExcel(orders, "EduNova_Forge_Project_Orders.xlsx")}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-bold hover:bg-purple-500/20 transition-all hover:scale-[1.02] shadow-[0_0_15px_rgba(168,85,247,0.15)]"
           >
             <FileSpreadsheet className="w-4 h-4" />
@@ -835,14 +907,34 @@ export default function AdminOrdersPage() {
                   <p className="text-gray-500 text-[10px] font-mono truncate">UID: {order.userId}</p>
                 </div>
 
-                {/* 2. Amount & Payment */}
+                {/* 2. Amount & Payment Breakdown (25% Advance Workflow) */}
                 <div className="space-y-1">
                   <p className="text-gray-500 uppercase tracking-wider text-[10px] font-semibold flex items-center gap-1">
-                    <IndianRupee className="w-3 h-3" /> Amount &amp; Payment
+                    <IndianRupee className="w-3 h-3" /> Amount Breakdown
                   </p>
                   <p className="text-xl font-black text-white tracking-tight">
                     ₹{(order.amount || 0).toLocaleString("en-IN")}
+                    <span className="text-[11px] text-gray-400 font-normal ml-1.5">paid</span>
                   </p>
+                  {order.totalProjectPrice || order.orderType === "advance_payment" ? (
+                    <div className="space-y-0.5 text-[11px] text-gray-400 font-mono">
+                      {(() => {
+                        const total = order.totalProjectPrice || (order.orderType === "advance_payment" ? Math.round(order.amount * 4) : order.amount);
+                        const advance = order.advanceAmount || (order.orderType === "advance_payment" ? order.amount : Math.round(total * 0.25));
+                        const isFinalApproved = order.finalPayment?.status === "approved" || order.orderType === "final_payment";
+                        const balance = isFinalApproved ? 0 : Math.max(0, total - advance);
+                        return (
+                          <>
+                            <p>Total Project Price: <strong className="text-gray-200">₹{total.toLocaleString("en-IN")}</strong></p>
+                            <p className="text-amber-300">25% Advance: ₹{advance.toLocaleString("en-IN")}</p>
+                            <p className={isFinalApproved ? "text-emerald-400 font-semibold" : "text-blue-300"}>
+                              75% Balance: ₹{balance.toLocaleString("en-IN")} {isFinalApproved ? "✓ Paid" : "(Pending)"}
+                            </p>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  ) : null}
                   {order.discountApplied && order.discountApplied > 0 ? (
                     <p className="text-emerald-400 text-[11px] font-semibold">
                       Discount applied: ₹{order.discountApplied}
@@ -1063,12 +1155,12 @@ export default function AdminOrdersPage() {
                   {order.status === "pending" && (
                     <>
                       <button
-                        onClick={() => handleReject(order)}
+                        onClick={() => openRejectionModal(order)}
                         disabled={isActionLoading === order.id}
                         className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-colors"
                       >
                         <XCircle className="w-3.5 h-3.5" />
-                        Reject Order
+                        Reject Payment
                       </button>
 
                       <button
@@ -1143,7 +1235,7 @@ export default function AdminOrdersPage() {
                     <p className="text-gray-400 text-[11px] truncate">{previewOrder.userEmail}</p>
                   </div>
                   <div>
-                    <span className="text-gray-400 text-[10px] uppercase">Amount</span>
+                    <span className="text-gray-400 text-[10px] uppercase">Verified Amount Paid</span>
                     <p className="text-white font-bold text-base">₹{(previewOrder.amount || 0).toLocaleString("en-IN")}</p>
                   </div>
                   <div>
@@ -1151,12 +1243,36 @@ export default function AdminOrdersPage() {
                     <p className="text-amber-300 font-mono font-bold">{previewOrder.utrNumber}</p>
                   </div>
                   <div>
-                    <span className="text-gray-400 text-[10px] uppercase">Current Status</span>
+                    <span className="text-gray-400 text-[10px] uppercase">Payment Status</span>
                     <div className="mt-1">
                       <StatusBadge status={previewOrder.status} />
                     </div>
                   </div>
                 </div>
+
+                {/* 25% Advance / 75% Balance Breakdown Box */}
+                {(previewOrder.totalProjectPrice || previewOrder.orderType === "advance_payment") && (
+                  <div className="grid grid-cols-3 gap-3 p-3.5 rounded-xl bg-purple-950/20 border border-purple-500/20 text-xs">
+                    <div>
+                      <span className="text-gray-400 text-[10px] uppercase block">Total Project Price</span>
+                      <span className="font-bold text-white text-sm">
+                        ₹{(previewOrder.totalProjectPrice || (previewOrder.orderType === "advance_payment" ? Math.round(previewOrder.amount / 0.25) : previewOrder.amount)).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-amber-400 text-[10px] uppercase block">Required 25% Advance</span>
+                      <span className="font-bold text-amber-300 text-sm">
+                        ₹{(previewOrder.advanceAmount || (previewOrder.orderType === "advance_payment" ? previewOrder.amount : Math.round((previewOrder.totalProjectPrice || previewOrder.amount) * 0.25))).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-cyan-400 text-[10px] uppercase block">Remaining 75% Balance</span>
+                      <span className="font-bold text-cyan-300 text-sm">
+                        ₹{(previewOrder.balanceAmount ?? (previewOrder.orderType === "advance_payment" ? Math.round(previewOrder.amount / 0.25) - previewOrder.amount : 0)).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Screenshot Viewer */}
                 <div>
@@ -1230,7 +1346,7 @@ export default function AdminOrdersPage() {
                   {previewOrder.status === "pending" && (
                     <>
                       <button
-                        onClick={() => handleReject(previewOrder)}
+                        onClick={() => openRejectionModal(previewOrder)}
                         disabled={isActionLoading === previewOrder.id}
                         className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold hover:bg-red-500/20"
                       >
@@ -1254,6 +1370,115 @@ export default function AdminOrdersPage() {
                     </button>
                   )}
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* ── Payment Rejection Modal (Mandatory Rejection Reason) ─────────── */}
+        {rejectionModalOrder && (
+          <div
+            className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+            onClick={() => setRejectionModalOrder(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-[#130d1d] border border-red-500/40 rounded-2xl max-w-lg w-full p-6 shadow-[0_0_50px_rgba(239,68,68,0.25)] relative text-left"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400">
+                    <XCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Reject Payment Submission</h3>
+                    <p className="text-[11px] text-gray-400">Order ID: {rejectionModalOrder.id}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setRejectionModalOrder(null)}
+                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Order Context */}
+              <div className="p-3 rounded-xl bg-black/40 border border-white/10 text-xs space-y-1 mb-4">
+                <p className="text-white font-semibold">{rejectionModalOrder.projectTitle}</p>
+                <div className="flex justify-between text-gray-400 text-[11px]">
+                  <span>Customer: <strong className="text-gray-200">{rejectionModalOrder.userName}</strong></span>
+                  <span>Amount Paid: <strong className="text-amber-300">₹{rejectionModalOrder.amount}</strong></span>
+                </div>
+                <p className="text-gray-400 text-[11px] font-mono">UTR: {rejectionModalOrder.utrNumber}</p>
+              </div>
+
+              {/* Quick Preset Reasons */}
+              <div className="space-y-1.5 mb-3">
+                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                  Select Common Rejection Reason
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    "Submitted UTR not found in bank statement",
+                    "Payment amount does not match required 75% advance",
+                    "Payment screenshot is blurry or invalid",
+                    "Transaction reversed or failed in UPI gateway",
+                    "Duplicate transaction reference submitted",
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setRejectionReasonText(preset)}
+                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all text-left ${
+                        rejectionReasonText === preset
+                          ? "bg-red-500/20 border-red-500/50 text-red-200 font-bold"
+                          : "bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10"
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Textarea for explanation */}
+              <div className="space-y-1.5 mb-5">
+                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                  Rejection Reason (Visible to Customer)
+                </label>
+                <textarea
+                  rows={3}
+                  value={rejectionReasonText}
+                  onChange={(e) => setRejectionReasonText(e.target.value)}
+                  placeholder="Explain why the payment cannot be verified so the student can correct their submission..."
+                  className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-red-500"
+                />
+                <p className="text-[10px] text-gray-500">
+                  This note will be shown on the user's dashboard and notification feed so they can resubmit valid payment proof.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setRejectionModalOrder(null)}
+                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmReject}
+                  disabled={isActionLoading === rejectionModalOrder.id || !rejectionReasonText.trim()}
+                  className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-[0_0_20px_rgba(239,68,68,0.4)] disabled:opacity-50 transition-all cursor-pointer"
+                >
+                  {isActionLoading === rejectionModalOrder.id ? "Rejecting..." : "Confirm & Reject Payment"}
+                </button>
               </div>
             </motion.div>
           </div>

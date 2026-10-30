@@ -74,7 +74,7 @@ export function PreviewModal({ project, onClose, onBuyNow }: Props) {
           <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1a] via-[#0a0a1a]/50 to-transparent" />
           <div className="absolute bottom-4 left-6 right-6 z-10">
             <h2 className="text-2xl font-black text-white drop-shadow-lg">{project.title}</h2>
-            <p className="text-gray-300 text-sm mt-1">by EduNova Team</p>
+            <p className="text-gray-300 text-sm mt-1">by EduNova Forge Team</p>
           </div>
         </div>
 

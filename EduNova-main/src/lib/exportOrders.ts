@@ -31,7 +31,7 @@ export function downloadOrdersExcel(orders: Order[], filename?: string) {
   let exportName = filename;
   if (!exportName) {
     const monthYear = new Date().toLocaleString("default", { month: "short", year: "numeric" }).replace(/\s/g, "");
-    exportName = `EduNova_Sales_Report_${monthYear}.xlsx`;
+    exportName = `EduNova_Forge_Sales_Report_${monthYear}.xlsx`;
   } else if (!exportName.endsWith(".xlsx")) {
     exportName = exportName.replace(/\.csv$/, "") + ".xlsx";
   }

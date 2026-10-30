@@ -55,3 +55,6 @@ build/
 coverage/
 .vercel/
 EduNova-main.7z
+
+/.open-next
+/.wrangler

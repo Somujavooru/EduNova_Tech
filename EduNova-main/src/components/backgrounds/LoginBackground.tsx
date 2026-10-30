@@ -57,16 +57,22 @@ export function LoginBackground() {
     const colors = ["#f59e0b", "#fbbf24", "#d97706", "#fef08a", "#ea580c"];
     let particles: Particle[] = [];
 
+    let isVisible = true;
+    const onVisibilityChange = () => {
+      isVisible = !document.hidden;
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     const initParticles = () => {
-      const count = Math.min(Math.floor((width * height) / 16000), 85);
+      const count = Math.min(Math.floor((width * height) / 42000), 28);
       particles = [];
       for (let i = 0; i < count; i++) {
         const radius = Math.random() * 2.2 + 1;
         particles.push({
           x: Math.random() * width,
           y: Math.random() * height,
-          vx: (Math.random() - 0.5) * 0.7,
-          vy: (Math.random() - 0.5) * 0.7,
+          vx: (Math.random() - 0.5) * 0.45,
+          vy: (Math.random() - 0.5) * 0.45,
           radius,
           baseRadius: radius,
           alpha: Math.random() * 0.6 + 0.3,
@@ -80,24 +86,32 @@ export function LoginBackground() {
     initParticles();
 
     // Render loop
+    const maxDistance = 110;
+    const maxDistSq = maxDistance * maxDistance;
+
     const render = () => {
+      if (!isVisible) {
+        animationFrameId = requestAnimationFrame(render);
+        return;
+      }
+
       ctx.clearRect(0, 0, width, height);
 
-      // Draw particle connections
-      const maxDistance = 120;
+      // Draw particle connections with squared distance optimization
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+          const distSq = dx * dx + dy * dy;
 
-          if (dist < maxDistance) {
+          if (distSq < maxDistSq) {
+            const dist = Math.sqrt(distSq);
             const proximity = 1 - dist / maxDistance;
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
             ctx.strokeStyle = `rgba(245, 158, 11, ${proximity * 0.28})`;
-            ctx.lineWidth = proximity * 1.1;
+            ctx.lineWidth = proximity * 1.0;
             ctx.stroke();
           }
         }
@@ -140,16 +154,12 @@ export function LoginBackground() {
         if (p.y < -10) p.y = height + 10;
         if (p.y > height + 10) p.y = -10;
 
-        // Draw particle with glow
-        ctx.save();
+        // Draw particle (hardware-accelerated, no CPU shadowBlur)
         ctx.beginPath();
         ctx.arc(p.x, p.y, Math.max(p.radius, 0.5), 0, Math.PI * 2);
         ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = 10;
         ctx.globalAlpha = p.alpha;
         ctx.fill();
-        ctx.restore();
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -162,6 +172,7 @@ export function LoginBackground() {
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseleave", handleMouseLeave);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 

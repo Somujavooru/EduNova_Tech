@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { sendNotification } from "@/lib/notifications";
+import { copyToClipboard } from "@/lib/clipboard";
 import { FormEvent, useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
@@ -26,7 +27,8 @@ import {
   ExternalLink, 
   Copy, 
   Check,
-  ChevronDown
+  ChevronDown,
+  AlertTriangle
 } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -220,24 +222,24 @@ function SignupForm() {
     if (err) {
       setResendStatus(`Failed: ${err}`);
     } else {
-      setResendStatus("Verification link resent! Check your inbox & spam folder.");
+      setResendStatus("Verification link resent! Please check both your Primary Inbox and your Spam / Junk folder.");
       setResendCooldown(60);
     }
     setIsResending(false);
   };
 
-  const copyEmailToClipboard = () => {
-    navigator.clipboard.writeText(registeredEmail);
+  const copyEmailToClipboard = async () => {
+    await copyToClipboard(registeredEmail);
     setCopiedEmail(true);
     setTimeout(() => setCopiedEmail(false), 2000);
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-5rem)] flex items-center justify-center px-4 py-8 md:py-16">
+    <div className="relative min-h-[calc(100vh-5rem)] flex items-center justify-center px-4 py-4 sm:py-6 lg:py-8">
       {/* ── Interactive Living Cosmic Nebula & Shooting Star Constellation Canvas ── */}
       <SignupBackground />
 
-      <div className="relative z-10 w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start my-4">
+      <div className="relative z-10 w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* Left Column: Benefits & Community Showcase (lg screens) */}
         <div className="hidden lg:flex lg:col-span-5 flex-col justify-between space-y-6 pt-4 pr-2">
@@ -250,7 +252,7 @@ function SignupForm() {
             <h1 className="text-4xl font-black text-white tracking-tight leading-[1.15] mb-4">
               Launch your engineering career with{" "}
               <span className="bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
-                EduNova.
+                EduNova Forge.
               </span>
             </h1>
 
@@ -313,7 +315,9 @@ function SignupForm() {
                 </span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-                Get started with EduNova
+                Get started with{" "}
+                <span className="text-[#00e5ff] drop-shadow-[0_0_8px_rgba(0,229,255,0.7)]">EduNova</span>{" "}
+                <span className="text-[#ff7828] drop-shadow-[0_0_8px_rgba(255,120,40,0.7)]">Forge</span>
               </h2>
               <p className="text-stone-400 text-sm mt-1">
                 Enter your details to create your student account
@@ -663,7 +667,7 @@ function SignupForm() {
                 </h2>
 
                 <p className="text-stone-300 text-sm leading-relaxed mb-4">
-                  We&apos;ve sent a secure verification link to activate your EduNova account:
+                  We&apos;ve sent a secure verification link to activate your EduNova Forge account:
                 </p>
 
                 {/* Email Highlight Box with Copy Button */}
@@ -689,7 +693,7 @@ function SignupForm() {
                   <p className="text-xs text-stone-400 font-medium mb-2.5">Open your inbox directly:</p>
                   <div className="grid grid-cols-2 gap-2.5">
                     <a
-                      href={`https://mail.google.com/mail/u/0/#search/EduNova`}
+                      href={`https://mail.google.com/mail/u/0/#search/EduNova+Forge`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="py-2.5 px-3 rounded-xl bg-stone-950/70 hover:bg-stone-800 border border-white/10 text-stone-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all hover:border-amber-500/40 group"
@@ -717,14 +721,14 @@ function SignupForm() {
                 </div>
 
                 {/* Next Steps List */}
-                <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-stone-300 text-xs text-left mb-6 space-y-2 leading-relaxed">
+                <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-stone-300 text-xs text-left mb-4 space-y-2 leading-relaxed">
                   <div className="flex items-center gap-2 font-semibold text-amber-300 text-xs">
                     <ShieldCheck className="w-4 h-4 text-amber-400" />
                     <span>How to activate your account:</span>
                   </div>
                   <div className="flex items-start gap-2 text-stone-300">
                     <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] shrink-0 mt-0.5 font-bold">1</span>
-                    <span>Open the email sent from <strong>EduNova Team</strong>.</span>
+                    <span>Open the email sent from <strong>EduNova Forge Team</strong>.</span>
                   </div>
                   <div className="flex items-start gap-2 text-stone-300">
                     <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] shrink-0 mt-0.5 font-bold">2</span>
@@ -734,9 +738,26 @@ function SignupForm() {
                     <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] shrink-0 mt-0.5 font-bold">3</span>
                     <span>Return and log in with your credentials to explore projects!</span>
                   </div>
-                  <p className="text-stone-500 text-[11px] pt-1">
-                    * If you don&apos;t see the message, please check your <strong>Spam</strong> or <strong>Updates</strong> folder.
-                  </p>
+                </div>
+
+                {/* Highly Prominent Spam / Junk Mail Alert Banner */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border-2 border-amber-500/40 text-left mb-6 shadow-[0_0_25px_rgba(245,158,11,0.15)] relative overflow-hidden">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                      <AlertTriangle className="w-5 h-5 text-amber-300 animate-pulse" />
+                    </div>
+                    <div className="text-xs leading-relaxed space-y-1">
+                      <p className="font-bold text-amber-300 text-sm flex items-center gap-1.5">
+                        ⚠️ Important: Check your Spam or Junk Folder!
+                      </p>
+                      <p className="text-stone-200 text-xs">
+                        If you don&apos;t see our email in your inbox within 1–2 minutes, <strong>please check your Spam, Junk, or Promotions/Updates folder</strong>. Automated verification emails often arrive there.
+                      </p>
+                      <p className="text-amber-200/90 text-[11px] pt-0.5">
+                        👉 <em>Click <strong>&quot;Report Not Spam&quot;</strong> or move it to your Primary Inbox to ensure you receive future project updates, downloads, and receipts!</em>
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {resendStatus && (

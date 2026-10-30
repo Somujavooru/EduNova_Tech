@@ -2,74 +2,35 @@
 import { useEffect, useRef } from "react";
 
 /* ──────────────────────────────────────────────────────────────────────────────
-   HomeBackground — Premium immersive canvas background
+   HomeBackground — High-Performance GPU-Accelerated Canvas & Cosmic Background
    
-   Layers (back → front):
-     1  CSS  – Deep space base gradient (#050510)
-     2  CSS  – Animated aurora borealis ribbons (amber / cyan / violet)
-     3  SVG  – Subtle honeycomb hex pattern overlay
-     4  Canvas – Interactive particle constellation + energy rings + glyphs
-     5  CSS  – 3D perspective cyber floor grid
-     6  CSS  – Hero vignette spotlight
+   Optimized for silky-smooth 60/120 FPS scrolling:
+     1. Automatic pause when scrolled past the hero view (saves 100% canvas GPU/CPU)
+     2. Throttled line drawing during active wheel scroll (zero scroll latency)
+     3. Native GPU-composited CSS transforms without memory-heavy will-change
+     4. Eliminated CPU-bound software CSS mask-image
+     5. Tab visibility pause when hidden
    ────────────────────────────────────────────────────────────────────────────── */
 
 interface Particle {
-  x: number; y: number;
-  vx: number; vy: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
   radius: number;
   baseRadius: number;
   color: string;
   alpha: number;
   pulsePhase: number;
   pulseSpeed: number;
-  orbitRadius: number;
-  orbitSpeed: number;
-  orbitAngle: number;
-}
-
-interface EnergyRing {
-  x: number; y: number;
-  radius: number;
-  maxRadius: number;
-  alpha: number;
-  color: string;
-  speed: number;
-}
-
-interface FloatingGlyph {
-  x: number; y: number;
-  vy: number; vx: number;
-  text: string;
-  alpha: number;
-  targetAlpha: number;
-  color: string;
-  size: number;
-  rotation: number;
-  rotSpeed: number;
-}
-
-interface ShootingStar {
-  x: number; y: number;
-  vx: number; vy: number;
-  length: number;
-  alpha: number;
-  color: string;
-  life: number;
-  maxLife: number;
 }
 
 const PALETTE = {
-  amber:  ["#f59e0b", "#fbbf24", "#f97316", "#fef08a"],
-  cyan:   ["#22d3ee", "#38bdf8", "#06b6d4"],
+  amber: ["#f59e0b", "#fbbf24", "#f97316"],
+  cyan: ["#22d3ee", "#38bdf8", "#06b6d4"],
   violet: ["#a78bfa", "#8b5cf6", "#c084fc"],
-  all: [] as string[],
 };
-PALETTE.all = [...PALETTE.amber, ...PALETTE.cyan, ...PALETTE.violet];
-
-const GLYPHS = [
-  "λ", "⚡", "IoT", "AI", "01", "∑", "◈", "⚙", "{ }",
-  "⟡", "∞", "◉", "ML", "⬡", "→", "∂", "π", "Δ",
-];
+const ALL_COLORS = [...PALETTE.amber, ...PALETTE.cyan, ...PALETTE.violet];
 
 export function HomeBackground() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -83,279 +44,148 @@ export function HomeBackground() {
     let raf: number;
     let W = (canvas.width = window.innerWidth);
     let H = (canvas.height = window.innerHeight);
-    let time = 0;
+    let isVisible = true;
+    let isScrolledPast = false;
+    let isScrolling = false;
+    let scrollTimeout: NodeJS.Timeout;
 
     const mouse = { x: -9999, y: -9999, active: false };
 
-    // ── Particles ───────────────────────────────────────────────────
+    // ── Optimized Particles — Constellation nodes ──
     let particles: Particle[] = [];
-    let energyRings: EnergyRing[] = [];
-    let glyphs: FloatingGlyph[] = [];
-    let shootingStars: ShootingStar[] = [];
 
     const init = () => {
       W = canvas.width = window.innerWidth;
       H = canvas.height = window.innerHeight;
 
-      // Particles — constellation nodes
-      const count = Math.min(Math.floor((W * H) / 12000), 90);
-      particles = Array.from({ length: count }, () => {
-        const useOrbit = Math.random() < 0.3;
+      // 28-36 particles provide beautiful constellation density with negligible CPU cost
+      const count = Math.min(Math.floor((W * H) / 36000), 34);
+      particles = Array.from({ length: Math.max(count, 20) }, () => {
+        const baseR = Math.random() * 1.6 + 0.8;
         return {
           x: Math.random() * W,
           y: Math.random() * H,
-          vx: (Math.random() - 0.5) * 0.35,
-          vy: (Math.random() - 0.5) * 0.35,
-          radius: Math.random() * 2.2 + 0.8,
-          baseRadius: Math.random() * 2.2 + 0.8,
-          color: PALETTE.all[Math.floor(Math.random() * PALETTE.all.length)],
-          alpha: Math.random() * 0.55 + 0.2,
+          vx: (Math.random() - 0.5) * 0.25,
+          vy: (Math.random() - 0.5) * 0.25,
+          radius: baseR,
+          baseRadius: baseR,
+          color: ALL_COLORS[Math.floor(Math.random() * ALL_COLORS.length)],
+          alpha: Math.random() * 0.45 + 0.2,
           pulsePhase: Math.random() * Math.PI * 2,
-          pulseSpeed: Math.random() * 0.025 + 0.008,
-          orbitRadius: useOrbit ? Math.random() * 40 + 20 : 0,
-          orbitSpeed: (Math.random() - 0.5) * 0.006,
-          orbitAngle: Math.random() * Math.PI * 2,
+          pulseSpeed: Math.random() * 0.02 + 0.008,
         };
       });
-
-      // Floating tech glyphs
-      const gCount = Math.min(Math.floor(W / 100), 18);
-      glyphs = Array.from({ length: gCount }, () => ({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        vy: -(Math.random() * 0.25 + 0.1),
-        vx: (Math.random() - 0.5) * 0.15,
-        text: GLYPHS[Math.floor(Math.random() * GLYPHS.length)],
-        alpha: 0,
-        targetAlpha: Math.random() * 0.18 + 0.06,
-        color: Math.random() > 0.5 ? "#f59e0b" : Math.random() > 0.5 ? "#38bdf8" : "#a78bfa",
-        size: Math.random() * 4 + 11,
-        rotation: (Math.random() - 0.5) * 0.3,
-        rotSpeed: (Math.random() - 0.5) * 0.002,
-      }));
-
-      energyRings = [];
-      shootingStars = [];
     };
 
     init();
 
-    // ── Event Handlers ──────────────────────────────────────────────
+    // ── Scroll & Visibility Listeners ──
     const onResize = () => init();
     const onMouseMove = (e: MouseEvent) => {
-      mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+      mouse.active = true;
     };
-    const onMouseLeave = () => { mouse.active = false; mouse.x = -9999; mouse.y = -9999; };
-    const onClick = (e: MouseEvent) => {
-      // Spawn energy ring on click
-      energyRings.push({
-        x: e.clientX, y: e.clientY,
-        radius: 5, maxRadius: 180,
-        alpha: 0.6,
-        color: PALETTE.amber[Math.floor(Math.random() * PALETTE.amber.length)],
-        speed: 3,
-      });
+    const onMouseLeave = () => {
+      mouse.active = false;
+      mouse.x = -9999;
+      mouse.y = -9999;
+    };
+    const onVisibilityChange = () => {
+      isVisible = !document.hidden;
     };
 
-    window.addEventListener("resize", onResize);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseleave", onMouseLeave);
-    canvas.addEventListener("click", onClick);
+    const onScroll = () => {
+      // Pause canvas entirely if scrolled past 90% of fold 1
+      isScrolledPast = window.scrollY > window.innerHeight * 0.95;
+      
+      // Temporarily throttle heavy line checks during rapid mouse wheel movements
+      isScrolling = true;
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        isScrolling = false;
+      }, 100);
+    };
 
-    // ── Render Loop ─────────────────────────────────────────────────
+    window.addEventListener("resize", onResize, { passive: true });
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    window.addEventListener("mouseleave", onMouseLeave, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    const maxDist = 125;
+    const maxDistSq = maxDist * maxDist;
+
+    // ── Ultra-Smooth 60/120 FPS Render Loop ──
     const render = () => {
+      // If tab hidden or user scrolled down past hero, sleep to give 100% CPU/GPU to page scrolling
+      if (!isVisible || isScrolledPast) {
+        raf = requestAnimationFrame(render);
+        return;
+      }
+
       ctx.clearRect(0, 0, W, H);
-      time += 0.016;
 
-      // — Spawn shooting stars occasionally
-      if (Math.random() < 0.008) {
-        const fromRight = Math.random() > 0.5;
-        shootingStars.push({
-          x: fromRight ? W + 10 : -10,
-          y: Math.random() * H * 0.5,
-          vx: (fromRight ? -1 : 1) * (Math.random() * 4 + 3),
-          vy: Math.random() * 2 + 1,
-          length: Math.random() * 80 + 40,
-          alpha: 1,
-          color: Math.random() > 0.6 ? "#fbbf24" : "#38bdf8",
-          life: 0,
-          maxLife: Math.random() * 60 + 40,
-        });
-      }
+      const len = particles.length;
 
-      // — Draw shooting stars
-      for (let i = shootingStars.length - 1; i >= 0; i--) {
-        const s = shootingStars[i];
-        s.x += s.vx; s.y += s.vy;
-        s.life++;
-        s.alpha = 1 - s.life / s.maxLife;
+      // Only draw connecting lines when not actively flicking the scroll wheel
+      if (!isScrolling) {
+        for (let i = 0; i < len; i++) {
+          const pi = particles[i];
+          for (let j = i + 1; j < len; j++) {
+            const pj = particles[j];
+            const dx = pi.x - pj.x;
+            const dy = pi.y - pj.y;
+            const distSq = dx * dx + dy * dy;
 
-        if (s.alpha <= 0) { shootingStars.splice(i, 1); continue; }
-
-        const tailX = s.x - s.vx * (s.length / 5);
-        const tailY = s.y - s.vy * (s.length / 5);
-        const grad = ctx.createLinearGradient(tailX, tailY, s.x, s.y);
-        grad.addColorStop(0, `rgba(255,255,255,0)`);
-        grad.addColorStop(1, s.color);
-
-        ctx.save();
-        ctx.globalAlpha = s.alpha * 0.7;
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(tailX, tailY);
-        ctx.lineTo(s.x, s.y);
-        ctx.stroke();
-
-        // Star head glow
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, 2, 0, Math.PI * 2);
-        ctx.fillStyle = "#fff";
-        ctx.shadowColor = s.color;
-        ctx.shadowBlur = 12;
-        ctx.fill();
-        ctx.restore();
-      }
-
-      // — Draw constellation connections
-      const maxDist = 140;
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < maxDist) {
-            const prox = 1 - dist / maxDist;
-            ctx.beginPath();
-            ctx.moveTo(particles[i].x, particles[i].y);
-            ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.strokeStyle = `rgba(245, 158, 11, ${prox * 0.18})`;
-            ctx.lineWidth = prox * 0.8;
-            ctx.stroke();
+            if (distSq < maxDistSq) {
+              const prox = 1 - Math.sqrt(distSq) / maxDist;
+              ctx.beginPath();
+              ctx.moveTo(pi.x, pi.y);
+              ctx.lineTo(pj.x, pj.y);
+              ctx.strokeStyle = `rgba(245, 158, 11, ${prox * 0.15})`;
+              ctx.lineWidth = prox * 0.7;
+              ctx.stroke();
+            }
           }
         }
       }
 
-      // — Draw cursor magnetic field lines
-      if (mouse.active) {
-        for (const p of particles) {
+      // Cursor subtle attraction
+      if (mouse.active && !isScrolling) {
+        for (let i = 0; i < len; i++) {
+          const p = particles[i];
           const mdx = mouse.x - p.x;
           const mdy = mouse.y - p.y;
-          const mdist = Math.sqrt(mdx * mdx + mdy * mdy);
-          if (mdist < 200) {
-            const force = (1 - mdist / 200);
-            // Attract lightly
-            p.x += (mdx / mdist) * force * 0.8;
-            p.y += (mdy / mdist) * force * 0.8;
-
-            // Draw connection to cursor
-            ctx.beginPath();
-            ctx.moveTo(mouse.x, mouse.y);
-            ctx.lineTo(p.x, p.y);
-            const grad = ctx.createLinearGradient(mouse.x, mouse.y, p.x, p.y);
-            grad.addColorStop(0, `rgba(251, 191, 36, ${force * 0.4})`);
-            grad.addColorStop(1, `rgba(56, 189, 248, ${force * 0.15})`);
-            ctx.strokeStyle = grad;
-            ctx.lineWidth = force * 1.2;
-            ctx.stroke();
+          const mdistSq = mdx * mdx + mdy * mdy;
+          if (mdistSq < 32000) {
+            const mdist = Math.sqrt(mdistSq);
+            const force = (1 - mdist / 180) * 0.45;
+            p.x += (mdx / mdist) * force;
+            p.y += (mdy / mdist) * force;
           }
         }
-
-        // Cursor glow
-        const cursorGrad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 60);
-        cursorGrad.addColorStop(0, "rgba(251, 191, 36, 0.15)");
-        cursorGrad.addColorStop(1, "rgba(251, 191, 36, 0)");
-        ctx.fillStyle = cursorGrad;
-        ctx.fillRect(mouse.x - 60, mouse.y - 60, 120, 120);
       }
 
-      // — Update & draw particles
-      for (const p of particles) {
+      // Hardware-native particle updates
+      for (let i = 0; i < len; i++) {
+        const p = particles[i];
         p.pulsePhase += p.pulseSpeed;
-        p.radius = p.baseRadius + Math.sin(p.pulsePhase) * 0.6;
+        p.radius = p.baseRadius + Math.sin(p.pulsePhase) * 0.4;
 
-        if (p.orbitRadius > 0) {
-          p.orbitAngle += p.orbitSpeed;
-          p.x += Math.cos(p.orbitAngle) * p.orbitSpeed * p.orbitRadius;
-          p.y += Math.sin(p.orbitAngle) * p.orbitSpeed * p.orbitRadius;
-        }
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < -10) p.x = W + 10;
+        if (p.x > W + 10) p.x = -10;
+        if (p.y < -10) p.y = H + 10;
+        if (p.y > H + 10) p.y = -10;
 
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < -20) p.x = W + 20;
-        if (p.x > W + 20) p.x = -20;
-        if (p.y < -20) p.y = H + 20;
-        if (p.y > H + 20) p.y = -20;
-
-        ctx.save();
         ctx.beginPath();
-        ctx.arc(p.x, p.y, Math.max(p.radius, 0.3), 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, Math.max(p.radius, 0.4), 0, Math.PI * 2);
         ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = 14;
         ctx.globalAlpha = p.alpha;
         ctx.fill();
-        ctx.restore();
       }
-
-      // — Draw floating glyphs
-      for (const g of glyphs) {
-        g.y += g.vy;
-        g.x += g.vx;
-        g.rotation += g.rotSpeed;
-
-        // Fade in smoothly
-        g.alpha += (g.targetAlpha - g.alpha) * 0.02;
-
-        if (g.y < -40) {
-          g.y = H + 40;
-          g.x = Math.random() * W;
-          g.text = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-          g.alpha = 0;
-        }
-
-        ctx.save();
-        ctx.translate(g.x, g.y);
-        ctx.rotate(g.rotation);
-        ctx.font = `600 ${g.size}px "SF Mono", "Fira Code", monospace`;
-        ctx.fillStyle = g.color;
-        ctx.globalAlpha = g.alpha;
-        ctx.textAlign = "center";
-        ctx.fillText(g.text, 0, 0);
-        ctx.restore();
-      }
-
-      // — Draw energy rings
-      for (let i = energyRings.length - 1; i >= 0; i--) {
-        const ring = energyRings[i];
-        ring.radius += ring.speed;
-        ring.alpha = (1 - ring.radius / ring.maxRadius) * 0.5;
-        if (ring.radius >= ring.maxRadius) {
-          energyRings.splice(i, 1);
-          continue;
-        }
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
-        ctx.strokeStyle = ring.color;
-        ctx.globalAlpha = ring.alpha;
-        ctx.lineWidth = 1.5;
-        ctx.shadowColor = ring.color;
-        ctx.shadowBlur = 20;
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // — Ambient pulsing central energy orb
-      const orbX = W * 0.5;
-      const orbY = H * 0.35;
-      const orbPulse = Math.sin(time * 0.8) * 0.3 + 0.7;
-      const orbGrad = ctx.createRadialGradient(orbX, orbY, 0, orbX, orbY, 250 * orbPulse);
-      orbGrad.addColorStop(0, "rgba(245, 158, 11, 0.06)");
-      orbGrad.addColorStop(0.5, "rgba(251, 191, 36, 0.02)");
-      orbGrad.addColorStop(1, "rgba(245, 158, 11, 0)");
-      ctx.fillStyle = orbGrad;
-      ctx.fillRect(orbX - 250, orbY - 250, 500, 500);
 
       raf = requestAnimationFrame(render);
     };
@@ -364,122 +194,110 @@ export function HomeBackground() {
 
     return () => {
       cancelAnimationFrame(raf);
+      clearTimeout(scrollTimeout);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseleave", onMouseLeave);
-      canvas.removeEventListener("click", onClick);
+      window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden select-none -z-10 bg-[#050510]">
-
-      {/* ── Layer 1: Aurora Borealis Ribbons ── */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Primary amber aurora */}
+      {/* ── Layer 1: Hardware-accelerated native radial glow orbs ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Primary amber glow */}
         <div
-          className="absolute top-[-15%] left-[-10%] w-[900px] h-[600px] rounded-full blur-[140px] animate-aurora-1"
+          className="absolute top-[-10%] left-[-5%] w-[800px] h-[550px] rounded-full animate-aurora-1 opacity-75"
           style={{
-            background: "linear-gradient(135deg, rgba(245,158,11,0.35), rgba(249,115,22,0.2), transparent)",
+            background:
+              "radial-gradient(ellipse at center, rgba(245,158,11,0.22) 0%, rgba(249,115,22,0.08) 45%, transparent 70%)",
           }}
         />
-        {/* Secondary cyan aurora */}
+        {/* Secondary cyan glow */}
         <div
-          className="absolute top-[15%] right-[-8%] w-[850px] h-[700px] rounded-full blur-[150px] animate-aurora-2"
+          className="absolute top-[12%] right-[-5%] w-[750px] h-[600px] rounded-full animate-aurora-2 opacity-65"
           style={{
-            background: "linear-gradient(225deg, rgba(34,211,238,0.2), rgba(56,189,248,0.12), transparent)",
+            background:
+              "radial-gradient(ellipse at center, rgba(34,211,238,0.18) 0%, rgba(56,189,248,0.06) 45%, transparent 70%)",
           }}
         />
-        {/* Tertiary violet aurora */}
+        {/* Tertiary violet glow */}
         <div
-          className="absolute bottom-[-10%] left-[20%] w-[700px] h-[550px] rounded-full blur-[130px] animate-aurora-3"
+          className="absolute bottom-[-5%] left-[20%] w-[650px] h-[450px] rounded-full animate-aurora-3 opacity-55"
           style={{
-            background: "linear-gradient(45deg, rgba(167,139,250,0.18), rgba(139,92,246,0.1), transparent)",
+            background:
+              "radial-gradient(ellipse at center, rgba(167,139,250,0.15) 0%, rgba(139,92,246,0.05) 45%, transparent 70%)",
           }}
         />
-        {/* Deep amber core glow */}
+        {/* Amber core accent */}
         <div
-          className="absolute top-[25%] left-[35%] w-[500px] h-[500px] rounded-full blur-[100px] animate-neon-pulse"
+          className="absolute top-[28%] left-[36%] w-[450px] h-[450px] rounded-full animate-neon-pulse opacity-60"
           style={{
-            background: "radial-gradient(circle, rgba(251,191,36,0.2) 0%, rgba(245,158,11,0.08) 40%, transparent 70%)",
+            background:
+              "radial-gradient(circle, rgba(251,191,36,0.18) 0%, rgba(245,158,11,0.05) 50%, transparent 75%)",
           }}
         />
       </div>
 
-      {/* ── Layer 2: Honeycomb Hex Pattern ── */}
-      <svg className="absolute inset-0 w-full h-full opacity-20 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+      {/* ── Layer 2: Lightweight SVG honeycomb hex pattern ── */}
+      <svg
+        className="absolute inset-0 w-full h-full opacity-18 pointer-events-none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <defs>
-          <pattern id="home-hex-grid" width="56" height="100" patternUnits="userSpaceOnUse" patternTransform="scale(1.5)">
+          <pattern
+            id="home-hex-grid"
+            width="56"
+            height="100"
+            patternUnits="userSpaceOnUse"
+            patternTransform="scale(1.5)"
+          >
             <path
               d="M28 2 L54 18 L54 50 L28 66 L2 50 L2 18 Z"
               fill="none"
               stroke="#f59e0b"
               strokeWidth="0.4"
-              strokeOpacity="0.5"
+              strokeOpacity="0.4"
             />
             <path
               d="M28 34 L54 50 L54 82 L28 98 L2 82 L2 50 Z"
               fill="none"
               stroke="#f59e0b"
               strokeWidth="0.4"
-              strokeOpacity="0.3"
+              strokeOpacity="0.25"
             />
-            {/* Node dots at vertices */}
-            <circle cx="28" cy="2" r="1" fill="#f59e0b" fillOpacity="0.6" />
-            <circle cx="28" cy="66" r="1" fill="#38bdf8" fillOpacity="0.4" />
+            <circle cx="28" cy="2" r="1" fill="#f59e0b" fillOpacity="0.5" />
+            <circle cx="28" cy="66" r="1" fill="#38bdf8" fillOpacity="0.35" />
           </pattern>
-          {/* Fade mask so the hex grid isn't uniform */}
-          <radialGradient id="hex-fade" cx="50%" cy="40%" r="60%">
-            <stop offset="0%" stopColor="white" stopOpacity="1" />
-            <stop offset="100%" stopColor="white" stopOpacity="0" />
-          </radialGradient>
-          <mask id="hex-mask">
-            <rect width="100%" height="100%" fill="url(#hex-fade)" />
-          </mask>
         </defs>
-        <rect width="100%" height="100%" fill="url(#home-hex-grid)" mask="url(#hex-mask)" />
+        <rect width="100%" height="100%" fill="url(#home-hex-grid)" />
       </svg>
 
       {/* ── Layer 3: Interactive Physics Canvas ── */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full pointer-events-auto"
+        className="absolute inset-0 w-full h-full pointer-events-none"
       />
 
-      {/* ── Layer 4: 3D Perspective Cyber Floor Grid ── */}
-      <div
-        className="absolute bottom-0 left-[-20%] right-[-20%] h-[400px] opacity-30 pointer-events-none"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, rgba(245,158,11,0.35) 1px, transparent 1px), linear-gradient(to bottom, rgba(245,158,11,0.35) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-          transform: "perspective(600px) rotateX(68deg)",
-          transformOrigin: "bottom center",
-          maskImage: "linear-gradient(to top, rgba(0,0,0,1) 15%, rgba(0,0,0,0) 85%)",
-          WebkitMaskImage: "linear-gradient(to top, rgba(0,0,0,1) 15%, rgba(0,0,0,0) 85%)",
-        }}
-      />
+      {/* ── Layer 4: 3D Perspective Cyber Floor Grid with pure CSS gradient overlay ── */}
+      <div className="absolute bottom-0 left-[-20%] right-[-20%] h-[360px] opacity-25 pointer-events-none overflow-hidden">
+        <div
+          className="w-full h-full"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(245,158,11,0.3) 1px, transparent 1px), linear-gradient(to bottom, rgba(245,158,11,0.3) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+            transform: "perspective(600px) rotateX(68deg)",
+            transformOrigin: "bottom center",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-[#050510]/80 to-[#050510] pointer-events-none" />
+      </div>
 
-      {/* ── Layer 5: Animated scan line ── */}
-      <div
-        className="absolute left-0 right-0 h-[1px] opacity-20 pointer-events-none animate-scan-line"
-        style={{
-          background: "linear-gradient(90deg, transparent, rgba(245,158,11,0.6), rgba(56,189,248,0.4), transparent)",
-        }}
-      />
-
-      {/* ── Layer 6: Hero Vignette ── */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_85%_70%_at_50%_35%,transparent_20%,#050510_80%)] pointer-events-none" />
-
-      {/* ── Subtle noise texture overlay ── */}
-      <div
-        className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay"
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-          backgroundRepeat: "repeat",
-          backgroundSize: "128px 128px",
-        }}
-      />
+      {/* ── Layer 5: Hero Vignette ── */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_85%_70%_at_50%_35%,transparent_25%,#050510_85%)] pointer-events-none" />
     </div>
   );
 }

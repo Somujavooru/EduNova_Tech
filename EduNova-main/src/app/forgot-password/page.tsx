@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="relative min-h-[calc(100vh-5rem)] flex items-center justify-center px-4 py-8 md:py-16">
+    <div className="relative min-h-[calc(100vh-5rem)] flex items-center justify-center px-4 py-4 sm:py-6 md:py-8">
       {/* ── Interactive Cryptographic Security Radar & Matrix Canvas ── */}
       <ForgotPasswordBackground />
 
@@ -64,21 +64,29 @@ export default function ForgotPasswordPage() {
                 If an account exists for <span className="text-amber-400 font-mono text-xs">{email}</span>, you will receive a reset link shortly.
               </p>
 
-              <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-6 w-full text-left space-y-1.5">
+              <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl mb-4 w-full text-left space-y-1.5">
                 <p className="text-amber-300 text-xs font-semibold flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
                   <span>Next Steps</span>
                 </p>
-                <p className="text-stone-300 text-xs">1. Check your inbox and click the reset link.</p>
-                <p className="text-stone-300 text-xs">2. Set your new password and sign in.</p>
-                <p className="text-stone-500 text-[11px] pt-1">
-                  * If you don&apos;t see it, check your <strong>Spam</strong> or <strong>Promotions</strong> folder.
-                </p>
+                <p className="text-stone-300 text-xs">1. Check your email and click the password reset link.</p>
+                <p className="text-stone-300 text-xs">2. Set your new password and sign back in.</p>
+              </div>
+
+              {/* Prominent Spam / Junk Alert Box */}
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border-2 border-amber-500/40 text-left mb-6 w-full flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-300 animate-pulse mt-0.5" />
+                <div className="text-xs text-stone-200 leading-relaxed">
+                  <p className="font-bold text-amber-300 text-xs mb-0.5">⚠️ Don&apos;t see the reset email?</p>
+                  <p className="text-stone-300 text-[11.5px]">
+                    Please check your <strong>Spam</strong>, <strong>Junk</strong>, or <strong>Promotions</strong> folder. Automated reset links often get filtered there.
+                  </p>
+                </div>
               </div>
 
               <div className="w-full flex flex-col gap-2.5">
                 <a
-                  href={`https://mail.google.com/mail/u/0/#search/EduNova`}
+                  href={`https://mail.google.com/mail/u/0/#search/EduNova+Forge`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-2.5 px-4 rounded-xl bg-stone-950/70 hover:bg-stone-800 border border-white/10 text-stone-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all hover:border-amber-500/40"

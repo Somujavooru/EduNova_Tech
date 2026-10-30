@@ -30,16 +30,25 @@ interface ContactMessageRecord {
   }>;
 }
 
-// GET /api/contact — Protected: Verified Admin only
+// GET /api/contact — Allows admins to fetch all inquiries, or verified users to fetch their own
 export async function GET(request: Request) {
   try {
-    const authResult = await verifyServerRequest(request, true);
-    if (!authResult.success) {
-      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    const authResult = await verifyServerRequest(request, false);
+    if (!authResult.success || !authResult.user) {
+      return NextResponse.json({ error: authResult.error || "Authentication required" }, { status: authResult.status || 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const filterEmail = searchParams.get("email");
+
+    const isAdmin = authResult.user.role === "admin";
+    // Non-admin users can ONLY fetch their own inquiries matching their auth email
+    let targetEmail: string | null = null;
+    if (!isAdmin) {
+      targetEmail = authResult.user.email.trim().toLowerCase();
+    } else if (filterEmail) {
+      targetEmail = filterEmail.trim().toLowerCase();
+    }
 
     const queryRef = adminDb.collection(COLLECTION_NAME).orderBy("createdAt", "desc").limit(100);
 
@@ -49,9 +58,8 @@ export async function GET(request: Request) {
       ...(doc.data() as Omit<ContactMessageRecord, "id">),
     }));
 
-    if (filterEmail) {
-      const cleanEmail = filterEmail.trim().toLowerCase();
-      messages = messages.filter((m) => m.email?.trim().toLowerCase() === cleanEmail);
+    if (targetEmail) {
+      messages = messages.filter((m) => m.email?.trim().toLowerCase() === targetEmail);
     }
 
     return NextResponse.json({
@@ -213,7 +221,7 @@ export async function PATCH(request: Request) {
     if (replyText && typeof replyText === "string" && replyText.trim().length > 0) {
       const cleanReply = replyText.trim().slice(0, 5000);
       const replyTimestamp = new Date().toISOString();
-      const author = repliedBy ? String(repliedBy).slice(0, 100) : "EduNova Support Admin";
+      const author = repliedBy ? String(repliedBy).slice(0, 100) : "EduNova Forge Support Admin";
 
       updatePayload.reply = cleanReply;
       updatePayload.repliedAt = replyTimestamp;

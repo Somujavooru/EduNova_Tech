@@ -62,7 +62,7 @@ function createAdminApp(): App {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const path = require("path");
       const raw = process.env.FIREBASE_SERVICE_ACCOUNT_PATH.trim().replace(/^['"]|['"]$/g, "");
-      const resolved = path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
+      const resolved = path.isAbsolute(raw) ? raw : path.resolve(/*turbopackIgnore: true*/ process.cwd(), raw);
       const targetPath = fs.existsSync(resolved) ? resolved : (fs.existsSync(raw) ? raw : null);
       if (targetPath) {
         const fileContent = fs.readFileSync(targetPath, "utf-8");
@@ -106,7 +106,7 @@ export function hasAdminCredentials(): boolean {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const path = require("path");
       const raw = process.env.FIREBASE_SERVICE_ACCOUNT_PATH.trim().replace(/^['"]|['"]$/g, "");
-      const resolved = path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
+      const resolved = path.isAbsolute(raw) ? raw : path.resolve(/*turbopackIgnore: true*/ process.cwd(), raw);
       return fs.existsSync(resolved) || fs.existsSync(raw);
     } catch {
       return false;

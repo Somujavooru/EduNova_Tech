@@ -6,8 +6,6 @@ import { Mail, Phone, MapPin, Send, CheckCircle, AlertTriangle, Building2, Messa
 import { Button } from "@/components/ui/Button";
 import { saveContactMessage, getSocialLinks, SocialMediaLinks } from "@/lib/data/contact";
 import { sendNotification } from "@/lib/notifications";
-import { Navbar } from "@/components/ui/Navbar";
-import { Footer } from "@/components/ui/Footer";
 
 // We can map social names to dynamic lucide icons, but lucide doesn't have full brand icons like WhatsApp/Telegram.
 // Let's create simple SVG components for them or use generic ones.
@@ -36,6 +34,7 @@ const SocialIcons: Record<string, React.ReactNode> = {
       <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
     </svg>
   ),
+  email: <Mail className="w-5 h-5" />,
   youtube: (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"></path>
@@ -65,7 +64,10 @@ export default function ContactPage() {
   const [socials, setSocials] = useState<SocialMediaLinks | null>(null);
 
   useEffect(() => {
-    setSocials(getSocialLinks());
+    const sync = () => setSocials(getSocialLinks());
+    sync();
+    window.addEventListener("edunova_settings_updated", sync);
+    return () => window.removeEventListener("edunova_settings_updated", sync);
   }, []);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -93,9 +95,7 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col pt-[80px]">
-      <Navbar />
-      
+    <div className="min-h-screen flex flex-col">
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 xl:px-12 py-12">
         {/* Header Section */}
         <div className="text-center max-w-3xl mx-auto mb-16">
@@ -146,7 +146,7 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500 font-semibold mb-1">Email Us</p>
-                    <a href="mailto:edunovasupport@gmail.com" className="text-white hover:text-[var(--color-neon-blue)] transition-colors font-medium">edunovasupport@gmail.com</a>
+                    <a href="mailto:edunovaforgessupport@gmail.com" className="text-white hover:text-[var(--color-neon-blue)] transition-colors font-medium">edunovaforgessupport@gmail.com</a>
                     <p className="text-xs text-gray-500 mt-1">We aim to reply within 24 hours</p>
                   </div>
                 </div>
@@ -159,14 +159,19 @@ export default function ContactPage() {
                 {socials && Object.entries(socials).map(([key, data]) => {
                   if (!data.enabled) return null;
                   const icon = SocialIcons[key] || <ArrowRight className="w-5 h-5" />;
+                  const isMail = key === "email" || data.url.startsWith("mailto:");
+                  const cleanHref = isMail ? `mailto:${data.url.replace(/^mailto:/, "")}` : data.url;
                   return (
-                    <span
+                    <a
                       key={key}
-                      className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-500 opacity-50 cursor-not-allowed transition-all duration-300"
-                      title={`${key.charAt(0).toUpperCase() + key.slice(1)} (Temporarily Inactive)`}
+                      href={cleanHref}
+                      target={isMail ? undefined : "_blank"}
+                      rel={isMail ? undefined : "noopener noreferrer"}
+                      className="w-12 h-12 rounded-full bg-white/5 border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 hover:text-amber-300 text-gray-300 flex items-center justify-center transition-all duration-300 hover:scale-105 shadow-sm cursor-pointer"
+                      title={key.charAt(0).toUpperCase() + key.slice(1)}
                     >
                       {icon}
-                    </span>
+                    </a>
                   );
                 })}
               </div>
@@ -196,7 +201,10 @@ export default function ContactPage() {
                     <CheckCircle className="w-10 h-10 text-green-400" />
                   </div>
                   <h4 className="text-2xl font-bold text-white mb-2">Message Sent!</h4>
-                  <p className="text-green-400/80 mb-8">Thank you for reaching out. We will get back to you shortly.</p>
+                  <p className="text-green-400/80 mb-2">Thank you for reaching out. We will get back to you shortly.</p>
+                  <p className="text-stone-400 text-xs mb-8 max-w-sm">
+                    Our reply will be sent to your email. If you don&apos;t see it in your inbox, please be sure to check your <strong>Spam</strong> or <strong>Junk</strong> folder.
+                  </p>
                   <Button onClick={() => setIsSuccess(false)} variant="secondary">Send Another Message</Button>
                 </motion.div>
               ) : (
@@ -302,8 +310,6 @@ export default function ContactPage() {
           </motion.div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }

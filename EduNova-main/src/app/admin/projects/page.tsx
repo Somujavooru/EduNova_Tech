@@ -14,8 +14,11 @@ import {
 import {
   FolderKanban, Search, CheckCircle, XCircle, Clock,
   Trash2, Star, TrendingUp, Award, Layout, IndianRupee,
-  Tag, Calendar, User, Edit3, X, Save, Layers, Sparkles, Check
+  Tag, Calendar, User, Edit3, X, Save, Layers, Sparkles, Check,
+  FileText, Presentation, Code2, Cpu, BookOpen, Plus, ExternalLink
 } from "lucide-react";
+import { ProjectDeliverable, getProjectDeliverables, saveStoredProjectDeliverables } from "@/lib/data/deliverables";
+import { ProjectDeliverablesSection } from "@/components/ui/ProjectDeliverablesSection";
 
 function ProjectStatusBadge({ status }: { status: Project["status"] }) {
   const config = {
@@ -69,6 +72,12 @@ export default function AdminProjectsPage() {
   const [editDeliverables, setEditDeliverables] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Deliverables Configuration Modal State
+  const [deliverablesModalProject, setDeliverablesModalProject] = useState<Project | null>(null);
+  const [modalDeliverables, setModalDeliverables] = useState<ProjectDeliverable[]>([]);
+  const [savingDeliverables, setSavingDeliverables] = useState(false);
+  const [activeDeliverablesTab, setActiveDeliverablesTab] = useState<"edit" | "preview">("edit");
+
   const refresh = async () => {
     const fetched = await getAllProjectsForAdmin();
     setProjects(fetched);
@@ -76,6 +85,17 @@ export default function AdminProjectsPage() {
 
   useEffect(() => {
     refresh();
+
+    window.addEventListener("edunova_projects_updated", refresh);
+    window.addEventListener("storage", refresh);
+
+    const timer = setInterval(refresh, 4000);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("edunova_projects_updated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, []);
 
   const handleApprove = async (id: string) => { await approveProject(id); refresh(); };
@@ -137,6 +157,56 @@ export default function AdminProjectsPage() {
     setSavingEdit(false);
     setEditingProject(null);
     await refresh();
+  };
+
+  const handleOpenDeliverablesModal = (project: Project) => {
+    setDeliverablesModalProject(project);
+    setModalDeliverables(getProjectDeliverables(project));
+    setActiveDeliverablesTab("edit");
+  };
+
+  const handleSaveDeliverables = async () => {
+    if (!deliverablesModalProject) return;
+    setSavingDeliverables(true);
+    try {
+      saveStoredProjectDeliverables(deliverablesModalProject.id, modalDeliverables);
+      await updateProject(deliverablesModalProject.id, { deliverables: modalDeliverables });
+      setDeliverablesModalProject(null);
+      await refresh();
+    } catch (e) {
+      console.error("Error saving deliverables:", e);
+      alert("Failed to save deliverables configuration: " + ((e as Error)?.message || e));
+    } finally {
+      setSavingDeliverables(false);
+    }
+  };
+
+  const handleToggleDeliverable = (id: string) => {
+    setModalDeliverables(prev =>
+      prev.map(item => item.id === id ? { ...item, isIncluded: !item.isIncluded } : item)
+    );
+  };
+
+  const handleUpdateDeliverableField = (id: string, field: keyof ProjectDeliverable, value: any) => {
+    setModalDeliverables(prev =>
+      prev.map(item => item.id === id ? { ...item, [field]: value } : item)
+    );
+  };
+
+  const handleAddCustomDocument = () => {
+    if (!deliverablesModalProject) return;
+    const cleanTitle = (deliverablesModalProject.title || "Project").replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_+/g, "_");
+    const newDoc: ProjectDeliverable = {
+      id: `doc_${Date.now()}`,
+      type: "other",
+      title: "Supporting Document",
+      format: "PDF",
+      description: "Additional technical specification or manual for this project.",
+      folderPath: `${cleanTitle}/Documents/Supporting_Doc.pdf`,
+      isIncluded: true,
+      status: "available",
+    };
+    setModalDeliverables(prev => [...prev, newDoc]);
   };
 
   const filtered = projects.filter(p => {
@@ -314,10 +384,19 @@ export default function AdminProjectsPage() {
                   {/* EDIT PROJECT BUTTON (FULL ADMIN ACCESS) */}
                   <button
                     onClick={() => handleStartEdit(project)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold hover:bg-cyan-500/20 transition-colors"
                     title="Edit Price, Title, Description and Info"
                   >
-                    <Edit3 className="w-3.5 h-3.5" /> Edit Info & Price
+                    <Edit3 className="w-3.5 h-3.5" /> Edit Info &amp; Price
+                  </button>
+
+                  {/* MANAGE DELIVERABLES BUTTON */}
+                  <button
+                    onClick={() => handleOpenDeliverablesModal(project)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-bold hover:bg-purple-500/25 transition-colors"
+                    title="Configure Project Deliverables & Documents"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-purple-400" /> Deliverables
                   </button>
 
                   {/* Delete Button */}
@@ -562,6 +641,226 @@ export default function AdminProjectsPage() {
                   )}
                   Save Changes
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────────────────────
+            ADMIN DELIVERABLES & DOCUMENTS MANAGEMENT MODAL
+        ───────────────────────────────────────────────────────────────────────────── */}
+        {deliverablesModalProject && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md p-3 sm:p-6 flex justify-center items-start">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-[#0e1120] border border-purple-500/40 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl my-4 sm:my-8 flex flex-col max-h-[92vh] text-left"
+            >
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between bg-[#13172e] flex-shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Project Deliverables &amp; Documents</h2>
+                    <p className="text-[11px] text-gray-400 font-mono truncate max-w-sm sm:max-w-md">
+                      {deliverablesModalProject.title}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex p-0.5 rounded-lg bg-black/40 border border-white/10 text-xs">
+                    <button
+                      onClick={() => setActiveDeliverablesTab("edit")}
+                      className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                        activeDeliverablesTab === "edit"
+                          ? "bg-purple-600 text-white shadow"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Configure Documents
+                    </button>
+                    <button
+                      onClick={() => setActiveDeliverablesTab("preview")}
+                      className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                        activeDeliverablesTab === "preview"
+                          ? "bg-purple-600 text-white shadow"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Student Preview
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setDeliverablesModalProject(null)}
+                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                {activeDeliverablesTab === "preview" ? (
+                  <div className="p-4 rounded-xl bg-black/40 border border-white/10">
+                    <ProjectDeliverablesSection
+                      project={{
+                        ...deliverablesModalProject,
+                        deliverables: modalDeliverables,
+                      }}
+                      mode="admin_preview"
+                      titleVariant="what_you_receive"
+                      showFolderTree={true}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                      <div>
+                        <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                          Included Deliverables &amp; File Formats
+                        </h4>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          Configure which documents will be provided to students. Missing or unconfigured files will be hidden.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddCustomDocument}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold hover:bg-purple-500/30 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Document
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {modalDeliverables.map((item) => (
+                        <div
+                          key={item.id}
+                          className={`p-4 rounded-xl border transition-all ${
+                            item.isIncluded
+                              ? "bg-white/[0.03] border-purple-500/30 shadow-[0_4px_20px_rgba(168,85,247,0.06)]"
+                              : "bg-white/[0.01] border-white/5 opacity-60"
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={item.isIncluded}
+                                onChange={() => handleToggleDeliverable(item.id)}
+                                className="w-4 h-4 rounded border-white/20 bg-black text-purple-600 focus:ring-purple-500 cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={item.title}
+                                onChange={(e) => handleUpdateDeliverableField(item.id, "title", e.target.value)}
+                                className="text-sm font-bold text-white bg-transparent border-b border-white/10 focus:border-purple-400 focus:outline-none px-1 py-0.5"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={item.format}
+                                onChange={(e) => handleUpdateDeliverableField(item.id, "format", e.target.value)}
+                                className="bg-black/60 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-amber-300 font-mono font-bold"
+                              >
+                                {["PDF", "PPTX", "PPT", "ZIP", "RAR", "DOCX", "PNG", "MP4"].map((f) => (
+                                  <option key={f} value={f} className="bg-[#0e1120] text-white">
+                                    {f}
+                                  </option>
+                                ))}
+                              </select>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setModalDeliverables((prev) => prev.filter((d) => d.id !== item.id))
+                                }
+                                className="text-gray-500 hover:text-red-400 p-1 transition-colors"
+                                title="Remove deliverable"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">
+                                Relative Folder Path
+                              </label>
+                              <input
+                                type="text"
+                                value={item.folderPath}
+                                onChange={(e) => handleUpdateDeliverableField(item.id, "folderPath", e.target.value)}
+                                placeholder="[Project]/Documents/..."
+                                className="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">
+                                Secure Download / Storage URL
+                              </label>
+                              <input
+                                type="text"
+                                value={item.fileUrl || ""}
+                                onChange={(e) => handleUpdateDeliverableField(item.id, "fileUrl", e.target.value)}
+                                placeholder="https://drive.google.com/... or cloud link"
+                                className="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-2.5">
+                            <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1">
+                              Description &amp; Contents
+                            </label>
+                            <input
+                              type="text"
+                              value={item.description}
+                              onChange={(e) => handleUpdateDeliverableField(item.id, "description", e.target.value)}
+                              placeholder="Describe what is covered in this document..."
+                              className="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-gray-300"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 sm:p-5 border-t border-white/10 bg-[#13172e] flex items-center justify-between gap-3 flex-shrink-0">
+                <span className="text-[11px] text-gray-400">
+                  {modalDeliverables.filter((d) => d.isIncluded).length} included deliverables configured
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDeliverablesModalProject(null)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingDeliverables}
+                    onClick={handleSaveDeliverables}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-500/20 disabled:opacity-50 transition-all"
+                  >
+                    {savingDeliverables ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
+                    Save Deliverables Configuration
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

@@ -51,7 +51,22 @@ export function ReviewSection({ projectId }: ReviewSectionProps) {
     }
   };
 
-  useEffect(() => { refresh(); }, [projectId, user]);
+  useEffect(() => {
+    refresh();
+
+    window.addEventListener("edunova_reviews_updated", refresh);
+    window.addEventListener("edunova_orders_updated", refresh);
+    window.addEventListener("storage", refresh);
+
+    const timer = setInterval(refresh, 3500);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("edunova_reviews_updated", refresh);
+      window.removeEventListener("edunova_orders_updated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [projectId, user?.id]);
 
   // Filters
   const [filterVerified, setFilterVerified] = useState(false);

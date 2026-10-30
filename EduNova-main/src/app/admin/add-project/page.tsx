@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { PlusCircle, CheckCircle, Image as ImageIcon, Upload, X, Link as LinkIcon, PackageCheck } from "lucide-react";
 import { addProject, Project } from "@/lib/data/mockProjects";
 import { compressImage } from "@/lib/imageUtils";
+import { generateId } from "@/lib/idUtils";
 
 export default function AdminAddProjectPage() {
   const [title, setTitle] = useState("");
@@ -73,7 +74,7 @@ export default function AdminAddProjectPage() {
     e.preventDefault();
 
     await addProject({
-      id: `proj-${crypto.randomUUID().replace(/-/g, "").substring(0, 10)}`,
+      id: generateId("proj").toLowerCase(),
       title,
       description,
       price: Number(price) || 0,
@@ -151,7 +152,7 @@ export default function AdminAddProjectPage() {
         </div>
         <div>
           <h1 className="text-2xl font-black text-white">Add New Project</h1>
-          <p className="text-gray-500 text-xs">Add a curated project to the EduNova marketplace</p>
+          <p className="text-gray-500 text-xs">Add a curated project to the EduNova Forge marketplace</p>
         </div>
       </div>
 

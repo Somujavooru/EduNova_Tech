@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let unsubSnapshot: (() => void) | null = null;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       devLog("[Auth] onAuthStateChanged fired. User:", firebaseUser?.uid || "null");
       
       // Clear previous listener if auth state changes
@@ -98,6 +98,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (firebaseUser) {
+        // Validate that user still actually exists in Firebase backend
+        try {
+          await firebaseUser.reload();
+        } catch (reloadErr: unknown) {
+          const code = (reloadErr as { code?: string })?.code;
+          devWarn("[Auth] User does not exist in Firebase Auth backend:", code || reloadErr);
+          await signOut(auth).catch(() => {});
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
         const isUserAdmin = checkIsAdmin(firebaseUser.email);
         const isGoogle = firebaseUser.providerData[0]?.providerId === "google.com";
         const isVerified = firebaseUser.emailVerified || isUserAdmin || isGoogle;
@@ -116,82 +128,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // REALTIME LISTENER: Any change in Firestore role immediately reflects here
         unsubSnapshot = onSnapshot(
           userRef,
-          (docSnap) => {
-            const now = new Date().toISOString();
-            const provider = firebaseUser.providerData[0]?.providerId === "google.com" ? "google" : "email";
-
+          async (docSnap) => {
             if (docSnap.exists()) {
               const data = docSnap.data() as User;
               const role = isUserAdmin || checkIsAdmin(data.email) || data.role === "admin" ? "admin" : "user";
               setUser({ ...data, id: firebaseUser.uid, role });
               setLoading(false);
             } else {
-              devLog("[Auth] User document missing. Creating new user document...");
-              
-              const storedReferredBy = typeof window !== "undefined" ? sessionStorage.getItem("edunova_ref") : null;
-              const newUser: User & { createdAt: string } = {
-                id: firebaseUser.uid,
-                name: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split("@")[0] : "EduNova User"),
-                email: firebaseUser.email!,
-                role: isUserAdmin ? "admin" : "user",
-                profilePicture: firebaseUser.photoURL || null,
-                phoneNumber: firebaseUser.phoneNumber || null,
-                provider,
-                lastLogin: now,
-                createdAt: now,
-                referredBy: storedReferredBy || null,
-                availableDiscount: 0,
-                referralUnlocked: false,
-                referralCompleted: false,
-                successfulReferralCount: 0,
-                maxReferralAllowed: 1,
-              };
-              
-              setDoc(userRef, newUser)
-                .then(() => {
-                  if (storedReferredBy) {
-                    import("@/lib/data/referrals").then(({ createReferral }) =>
-                      createReferral(storedReferredBy, firebaseUser.uid)
-                    );
-                  }
-                  devLog("[Auth] New user document created successfully.");
-                  setShowWelcome(true);
-                  sendNotification("login", { userName: newUser.name, userEmail: newUser.email });
-                })
-                .catch((err) => {
-                  console.warn("[Auth] Notice creating user document (proceeding with session):", err?.message || err);
-                  setUser(newUser);
-                  setLoading(false);
-                });
+              // User document was removed/deleted from the database -> force sign out so they must register
+              devLog("[Auth] User document does not exist in database. Signing out user so they register fresh.");
+              if (unsubSnapshot) {
+                unsubSnapshot();
+                unsubSnapshot = null;
+              }
+              await signOut(auth).catch(() => {});
+              setUser(null);
+              setLoading(false);
             }
           },
-          (error) => {
-            console.warn("[Auth] Realtime listener notice (using session fallback):", error?.message || error);
-
+          async (error) => {
+            console.warn("[Auth] Realtime listener error:", error?.message || error);
             if (unsubSnapshot) {
               unsubSnapshot();
               unsubSnapshot = null;
             }
-
-            const fallbackUser: User = {
-              id: firebaseUser.uid,
-              name: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split("@")[0] : "EduNova User"),
-              email: firebaseUser.email || "",
-              role: isUserAdmin ? "admin" : "user",
-              profilePicture: firebaseUser.photoURL || null,
-              provider: firebaseUser.providerData[0]?.providerId === "google.com" ? "google" : "email",
-              lastLogin: new Date().toISOString(),
-              createdAt: new Date().toISOString(),
-              referredBy: null,
-              availableDiscount: 0,
-              referralUnlocked: false,
-              referralCompleted: false,
-              successfulReferralCount: 0,
-              maxReferralAllowed: 1,
-            };
-
-            setUser(fallbackUser);
-            setAuthError(null);
+            await signOut(auth).catch(() => {});
+            setUser(null);
             setLoading(false);
           }
         );
@@ -211,8 +173,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Handle return from signInWithRedirect (fallback when popup is blocked)
   useEffect(() => {
-    getRedirectResult(auth).then((result) => {
+    getRedirectResult(auth).then(async (result) => {
       if (result?.user) {
+        const email = result.user.email || "";
+        const userRef = doc(db, "users", result.user.uid);
+        const docSnap = await getDoc(userRef).catch(() => null);
+        const now = new Date().toISOString();
+        if (!docSnap || !docSnap.exists()) {
+          const storedReferredBy = typeof window !== "undefined" ? sessionStorage.getItem("edunova_ref") : null;
+          const isUserAdmin = checkIsAdmin(email);
+          const newUser: User & { createdAt: string } = {
+            id: result.user.uid,
+            name: result.user.displayName || (email ? email.split("@")[0] : "EduNova User"),
+            email,
+            role: isUserAdmin ? "admin" : "user",
+            profilePicture: result.user.photoURL || null,
+            phoneNumber: result.user.phoneNumber || null,
+            provider: "google",
+            lastLogin: now,
+            createdAt: now,
+            referredBy: storedReferredBy || null,
+            availableDiscount: 0,
+            referralUnlocked: false,
+            referralCompleted: false,
+            successfulReferralCount: 0,
+            maxReferralAllowed: 1,
+          };
+          await setDoc(userRef, newUser).catch(() => {});
+        } else {
+          await setDoc(userRef, { lastLogin: now }, { merge: true }).catch(() => {});
+        }
         router.push("/dashboard");
       }
     }).catch(() => { /* redirect result errors are non-critical */ });
@@ -278,10 +268,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return new Promise((resolve) => {
       signInWithPopup(auth, googleProvider)
-        .then((result) => {
+        .then(async (result) => {
           const additionalInfo = getAdditionalUserInfo(result);
           const email = result.user.email || "";
-          const name = result.user.displayName || "User";
+          const name = result.user.displayName || (email ? email.split("@")[0] : "User");
           
           if (additionalInfo?.isNewUser) {
             triggerEmailEvent("welcome", email, name);
@@ -290,7 +280,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           const userRef = doc(db, "users", result.user.uid);
-          setDoc(userRef, { lastLogin: new Date().toISOString() }, { merge: true }).catch(() => {});
+          const docSnap = await getDoc(userRef).catch(() => null);
+          const now = new Date().toISOString();
+          
+          if (!docSnap || !docSnap.exists()) {
+            const storedReferredBy = typeof window !== "undefined" ? sessionStorage.getItem("edunova_ref") : null;
+            const isUserAdmin = checkIsAdmin(email);
+            const newUser: User & { createdAt: string } = {
+              id: result.user.uid,
+              name,
+              email,
+              role: isUserAdmin ? "admin" : "user",
+              profilePicture: result.user.photoURL || null,
+              phoneNumber: result.user.phoneNumber || null,
+              provider: "google",
+              lastLogin: now,
+              createdAt: now,
+              referredBy: storedReferredBy || null,
+              availableDiscount: 0,
+              referralUnlocked: false,
+              referralCompleted: false,
+              successfulReferralCount: 0,
+              maxReferralAllowed: 1,
+            };
+            await setDoc(userRef, newUser).catch(() => {});
+            setShowWelcome(true);
+            if (storedReferredBy) {
+              import("@/lib/data/referrals").then(({ createReferral }) =>
+                createReferral(storedReferredBy, result.user.uid)
+              ).catch(() => {});
+            }
+          } else {
+            await setDoc(userRef, { lastLogin: now }, { merge: true }).catch(() => {});
+          }
 
           resolve(null);
         })

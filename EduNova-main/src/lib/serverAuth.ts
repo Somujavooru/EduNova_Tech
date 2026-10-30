@@ -58,6 +58,19 @@ export async function verifyServerRequest(
     // 1. Check custom claim (primary admin check)
     if (decoded.admin === true) {
       role = "admin";
+    } else if (
+      decoded.email_verified === true &&
+      (email === "somashekharjavooru@gmail.com" ||
+        email === "vijayrk0513@gmail.com" ||
+        email === "somashekhar@edunova.com" ||
+        email === "vijay@edunova.com" ||
+        email === "admin@edunova.com")
+    ) {
+      role = "admin";
+      // Auto-grant Firebase Auth custom claim so Firestore security rules recognize admin immediately
+      if (hasAdminCredentials()) {
+        adminAuth.setCustomUserClaims(uid, { admin: true }).catch(() => {});
+      }
     } else if (hasAdminCredentials()) {
       // 2. Fallback: check Firestore users/{uid} document (only if credentials configured)
       try {
